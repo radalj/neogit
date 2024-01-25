@@ -43,6 +43,175 @@ void print_command(int argc, char * const argv[]) {
     fprintf(stdout, "\n");
 }
 
+char * find_source(){
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) return "NULL";
+    char* ret = (char *)malloc(1024);
+    strcpy(ret, cwd);
+    char* p = strstr(ret, ".neogit");
+    p[7] = '\0';
+    return ret;
+}
+
+void copy_file(char *src,char * des){
+    FILE * s = fopen(src, "r");
+    FILE * d = fopen(des, "w");
+    char * c = (char *)malloc(1000);
+    while (fgets(c, 1000, s) != NULL){
+        fprintf(d,"%s",c);
+    }
+    fclose(d);
+    fclose(s);
+}
+
+int add_to_line(char * src,char* word, char* key){
+    FILE * com = fopen(src, "r");
+    if (com == NULL) return 0;
+    bool exist = 0;
+    char* line = (char *)malloc(1000);
+    char part[100];
+    int line_num = 0;
+    while (fgets(line, 1000, com) != NULL){
+        line_num++;
+        while (sscanf(line, "%s", part) != EOF){
+            line += strlen(part);
+            if (line[0] != '\0') line++;
+            if (strcmp(part, key) == 0){
+                exist = 1;
+                break;
+            }
+        }
+        if (exist){
+            break;
+        }
+    }
+    if (exist == 0){
+        return 0;
+    }
+    fclose(com);
+    char* des = "/home/radal/.base/commands_copy";
+    copy_file(src, des);
+    int i = 0;
+    com = fopen(src, "w");
+    FILE* com2 = fopen(des, "r");
+    while (fgets(line, 1000, com2) != NULL){
+        i++;
+        line[strlen(line) - 1] = '\0';
+        if (i == line_num){
+            fprintf(com, "%s %s\n", line, word);
+        }
+        else{
+            fprintf(com, "%s\n", line);
+        }
+    }
+    fclose(com);
+    fclose(com2);
+    remove(des);
+    return 1;
+}
+
+void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
+    char * newdir = malloc(strlen(dir)+50);
+    strcpy(newdir, dir);
+    strcat(newdir,"/.neogit/config\0");
+    FILE* conf = fopen(newdir, "r");
+    if (conf == NULL) return;
+    char username[100],email[200],last_commit_id[10],current_commit_id[10],branch[100];
+    char chert[40];
+    fscanf(conf,"%s %s", chert, username);
+    fscanf(conf,"%s %s", chert, email);
+    fscanf(conf,"%s %s", chert, last_commit_id);
+    fscanf(conf,"%s %s", chert, current_commit_id);
+    fscanf(conf,"%s %s", chert, branch);
+    fclose(conf);
+    if (fl) strcpy(email,nw);
+    else strcpy(username,nw);
+    conf = fopen(newdir, "w");
+    fprintf(conf, "username: %s\n", username);
+    fprintf(conf, "email: %s\n", email);
+    fprintf(conf, "last_commit_id: %s\n", last_commit_id);
+    fprintf(conf, "current_commit_id: %s\n", current_commit_id);
+    fprintf(conf, "branch: %s\n", branch);
+    fclose(conf);
+    free(newdir);
+    return;
+}
+
+int config(int argc, char * const argv[]){    
+    bool isglobal = (strcmp(argv[2], "-global") != 0);
+    if (argc < 6 - isglobal){
+        printf("Too few arguments\n");
+        return 1;
+    }
+    if (strcmp(argv[2], "-global") == 0){
+        if (strcmp(argv[3], "user") == 0){
+            int fl = -1;
+            if (strcmp(argv[4],"name") == 0) fl = 0;
+            else if (strcmp(argv[4],"email") == 0) fl = 1;
+            else{
+                printf("Invalid command\n");
+                return 1;
+            }
+            FILE* list = fopen("/home/radal/.base/list","r");
+            char dir[1000];
+            while (fscanf(list,"%s",dir) != EOF){
+                write_config(dir, argv[5], fl);
+            }
+            printf("Global success!\n");
+            return 0;
+        }
+        if (strcmp(argv[3], "alias") == 0){
+            char* src = "/home/radal/.base/commands";
+            bool fl = add_to_line(src, argv[4], argv[5]);
+            if (fl == 0){
+                printf("there's no command as %s!\n", argv[5]);
+                return 1;
+            }
+            FILE* list = fopen("/home/radal/.base/list", "r");
+            char* pth = (char *)malloc(1000);
+            while (fscanf(list, "%s", pth) != EOF){
+                strcat(pth,"/.neogit/commands");
+                printf("%s\n",pth);
+                add_to_line(pth, argv[4], argv[5]);
+            }
+            fclose(list);
+            free(pth);
+            printf("alias %s was added successfully and globaly!\n", argv[4]);
+            return 0;
+        }
+        printf("What the Fuck do you mean!\n");
+        return 1;
+    }
+    if (strcmp(argv[2], "user") == 0){
+        int fl = -1;
+        if (strcmp(argv[3],"name") == 0) fl = 0;
+        else if (strcmp(argv[3],"email") == 0) fl = 1;
+        else{
+            printf("Invalid command\n");
+            return 1;
+        }
+        char* des = find_source();
+        des[strlen(des) - 7] = '\0';
+        write_config(des, argv[4], fl);
+        printf("Success!\n");
+        return 0;
+    }
+    if (strcmp(argv[2], "alias") == 0){
+        char* src = find_source();
+        src = realloc(src, strlen(src) + 20);
+        strcat(src, "/commands");
+        bool fl = add_to_line(src, argv[3], argv[4]);
+        if (fl == 0){
+            printf("there's no command as %s\n", argv[4]);
+            return 1;
+        }
+        printf("alias %s was added successfully!\n", argv[3]);
+        return 0;
+    }
+    printf("What the fuck do you mean!\n");
+    return 1;
+}
+
 int run_init(int argc, char * const argv[]) {
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) == NULL) return 1;
@@ -107,6 +276,8 @@ int create_configs(char *username, char *email) {
 
     file = fopen(".neogit/staging", "w");
     fclose(file);
+
+    copy_file("/home/radal/.base/commands",".neogit/commands");
 
     file = fopen(".neogit/tracks", "w");
     fclose(file);
@@ -458,6 +629,9 @@ int main(int argc, char *argv[]) {
     
 //    print_command(argc, argv);
 
+    if (strcmp(argv[1], "config") == 0){
+        return config(argc, argv);
+    }
     if (strcmp(argv[1], "init") == 0) {
         return run_init(argc, argv);
     }
