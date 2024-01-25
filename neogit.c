@@ -621,30 +621,50 @@ int checkout_file(char *filepath, int commit_ID) {
 }
 
 int main(int argc, char *argv[]) {
-    
     if (argc < 2) {
         fprintf(stdout, "please enter a valid command\n");
         return 1;
     }
-    
-//    print_command(argc, argv);
 
-    if (strcmp(argv[1], "config") == 0){
+    char line[1000];
+    char * command = calloc(20, sizeof(char));
+    FILE * fl = fopen("/home/radal/.base/commands","r");
+    while(fgets(line, 1000, fl) != NULL){
+        if (strstr(line, argv[1]) != NULL){
+            sscanf(line, "%s", command);
+            break;
+        }
+    }
+    fclose(fl);
+    if (command[0] == '\0'){
+        char* dir = find_source();
+        dir = realloc(dir, strlen(dir)+20);
+        strcat(dir,"/commands");
+        fl = fopen(dir, "r");
+        while(fgets(line, 1000, fl) != NULL){
+            if (strstr(line, argv[1]) != NULL){
+                sscanf(line, "%s", command);
+                break;
+            }
+        }
+        fclose(fl);
+    }
+    if (strcmp(command, "config") == 0){
         return config(argc, argv);
     }
-    if (strcmp(argv[1], "init") == 0) {
+    if (strcmp(command, "init") == 0) {
         return run_init(argc, argv);
     }
-    if (strcmp(argv[1], "add") == 0) {
+    if (strcmp(command, "add") == 0) {
         return run_add(argc, argv);
     }
-    if (strcmp(argv[1], "reset") == 0) {
+    if (strcmp(command, "reset") == 0) {
         return run_reset(argc, argv);
     }
-    if (strcmp(argv[1], "commit") == 0) {
+    if (strcmp(command, "commit") == 0) {
         return run_commit(argc, argv);
     }
-    if (strcmp(argv[1], "checkout") == 0) {
+    if (strcmp(command, "checkout") == 0) {
         return run_checkout(argc, argv);
     }
     
