@@ -110,6 +110,24 @@ int add_to_line(char * src,char* word, char* key){
     return 1;
 }
 
+char* abs_path(char* path){
+    char cwd[1000];
+    if (getcwd(cwd,1000) == NULL) return NULL;
+    strcat(cwd, "/");
+    strcat(cwd, path);
+    char * ret = (char *)calloc(1000,1);
+    strcpy(ret, cwd);
+    return ret;
+}
+
+int is_dir(char* path){
+    struct stat st_buf;
+    int status = stat(path, &st_buf);
+    if (status != 0) return -1;
+    if (S_ISREG(st_buf.st_mode)) return 0;
+    if (S_ISDIR(st_buf.st_mode)) return 1;
+}
+
 void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
     char * newdir = malloc(strlen(dir)+50);
     strcpy(newdir, dir);
@@ -171,7 +189,6 @@ int config(int argc, char * const argv[]){
             char* pth = (char *)malloc(1000);
             while (fscanf(list, "%s", pth) != EOF){
                 strcat(pth,"/.neogit/commands");
-                printf("%s\n",pth);
                 add_to_line(pth, argv[4], argv[5]);
             }
             fclose(list);
@@ -247,9 +264,11 @@ int run_init(int argc, char * const argv[]) {
     if (!exists) {
         if (mkdir(".neogit", 0755) != 0) return 1;
         printf("successfully initialized the project!\n");
-        FILE* list = fopen("/home/radal/.base/list","a");
+        FILE* list = fopen("/home/radal/.base/list", "a");
         fprintf(list,"%s\n",cwd);
         fclose(list);
+        list = fopen("home/radal/.base/config", "r");
+
         return create_configs("radin", "radinjarireh@gmail.com");
     }
     printf("neogit repository has already initialized\n");
@@ -287,16 +306,51 @@ int create_configs(char *username, char *email) {
 
 int run_add(int argc, char *const argv[]) {
     // TODO: handle command in non-root directories 
-    if (argc < 3) {
-        perror("please specify a file");
+    bool isf = (strcmp(argv[2], "-f") == 0);
+    if (argc < 3 + isf) {
+        printf("please specify a file\n");
         return 1;
     }
 
-    return add_to_staging(argv[2]);
+    if (argv[2][0] != '-' || isf){
+        bool fl = 0;
+        for (int i = 2 + isf; i < argc; i++){
+            fl |= add_to_staging(abs_path(argv[i]));
+        }
+        return fl;
+    }
 }
 
 int add_to_staging(char *filepath) {
-    FILE *file = fopen(".neogit/staging", "r");
+    int isdir = is_dir(filepath);
+    if (isdir == -1){
+        perror("There's no such file or directory");
+        return 1;
+    }
+    if (isdir == 1){
+        struct dirent *entry;
+        DIR *dir = opendir(filepath);
+        if (dir == NULL){
+            perror("Error opening directory");
+        }
+        int len = strlen(filepath);
+        filepath[len] = '/';
+        filepath[len + 1] = '\0';
+        bool fl = 0;
+        while ((entry = readdir(dir)) != NULL){
+            if (strcmp(entry->d_name,".") == 0) continue;
+            if (strcmp(entry->d_name,"..") == 0) continue;
+            strcat(filepath,entry->d_name);
+            fl |= add_to_staging(filepath);
+            filepath[len+1] = '\0';
+        }
+        closedir(dir);
+        return fl;
+    }
+    char* src = find_source(filepath);
+    src = (char *)realloc(src, strlen(src) + 10);
+    strcat(src, "/staging");
+    FILE *file = fopen(src, "r");
     if (file == NULL) return 1;
     char line[MAX_LINE_LENGTH];
     while (fgets(line, sizeof(line), file) != NULL) {
@@ -311,7 +365,7 @@ int add_to_staging(char *filepath) {
     }
     fclose(file);
     
-    file = fopen(".neogit/staging","a");
+    file = fopen(src,"a");
     if (file == NULL) return 1;
 
     fprintf(file, "%s\n", filepath);
