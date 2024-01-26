@@ -376,19 +376,58 @@ int add_to_staging(char *filepath) {
 
 int run_reset(int argc, char *const argv[]) {
     // TODO: handle command in non-root directories 
-    if (argc < 3) {
-        perror("please specify a file");
+    bool isf = (strcmp(argv[2], "-f") == 0);
+    if (argc < 3 + isf) {
+        printf("please specify a file\n");
         return 1;
     }
-    
+
+    if (argv[2][0] != '-' || isf){
+        bool fl = 0;
+        for (int i = 2 + isf; i < argc; i++){
+            fl |= remove_from_staging(abs_path(argv[i]));
+        }
+        return fl;       
+    }
+
     return remove_from_staging(argv[2]);
 }
 
 int remove_from_staging(char *filepath) {
-    FILE *file = fopen(".neogit/staging", "r");
+    int isdir = is_dir(filepath);
+    if (isdir == -1){
+        perror("There's no such file or directory");
+        return 1;
+    }
+    if (isdir == 1){
+        struct dirent *entry;
+        DIR *dir = opendir(filepath);
+        if (dir == NULL){
+            perror("Error opening directory");
+        }
+        int len = strlen(filepath);
+        filepath[len] = '/';
+        filepath[len + 1] = '\0';
+        bool fl = 0;
+        while ((entry = readdir(dir)) != NULL){
+            if (strcmp(entry->d_name,".") == 0) continue;
+            if (strcmp(entry->d_name,"..") == 0) continue;
+            strcat(filepath,entry->d_name);
+            fl |= remove_from_staging(filepath);
+            filepath[len+1] = '\0';
+        }
+        closedir(dir);
+        return fl;
+    }
+    char* src = find_source();
+    char* tmp_src = (char *)calloc(1000,1);
+    strcpy(tmp_src, src);
+    strcat(src, "/staging");
+    strcat(tmp_src, "/tmp_staging");
+    FILE *file = fopen(src, "r");
     if (file == NULL) return 1;
     
-    FILE *tmp_file = fopen(".neogit/tmp_staging", "w");
+    FILE *tmp_file = fopen(tmp_src, "w");
     if (tmp_file == NULL) return 1;
 
     char line[MAX_LINE_LENGTH];
@@ -400,13 +439,13 @@ int remove_from_staging(char *filepath) {
             line[length - 1] = '\0';
         }
 
-        if (strcmp(filepath, line) != 0) fputs(line, tmp_file);
+        if (strcmp(filepath, line) != 0) fprintf(tmp_file, "%s\n", line);
     }
     fclose(file);
     fclose(tmp_file);
 
-    remove(".neogit/staging");
-    rename(".neogit/tmp_staging", ".neogit/staging");
+    remove(src);
+    rename(tmp_src, src);
     return 0;
 }
 
