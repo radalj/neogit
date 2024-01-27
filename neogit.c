@@ -44,9 +44,9 @@ void print_command(int argc, char * const argv[]) {
 }
 
 char * find_source(){
-    char cwd[1024];
+    char cwd[2024];
     if (getcwd(cwd, sizeof(cwd)) == NULL) return "NULL";
-    char* ret = (char *)malloc(1024);
+    char* ret = (char *)malloc(2024);
     strcpy(ret, cwd);
     char* p = strstr(ret, ".neogit");
     p[7] = '\0';
@@ -333,8 +333,38 @@ int run_add(int argc, char *const argv[]) {
 int add_to_staging(char *filepath) {
     int isdir = is_dir(filepath);
     if (isdir == -1){
-        printf("There's no such file or directory\n!");
-        return 1;
+        char* src = find_source();
+        char* src2 = find_source();
+        strcat(src,"/tracks");
+        strcat(src2,"/tracks2");
+        FILE* fl = fopen(src, "r");
+        char line[2000]; 
+        bool exist = 0;
+        int line_num = 0;
+        while (fgets(line, 2000, fl) != NULL){
+            line[strlen(line) - 1] = '\0';
+            line_num++;
+            if (strcmp(line, filepath) == 0){
+                exist = 1;
+                break;
+            }
+        }
+        if (exist == 0){
+            printf("There's no such file or directory\n!");
+            return 1;
+        }
+        rewind(fl);
+        FILE* fl2 = fopen(src2, "w");
+        while (fgets(line, 2000, fl) != NULL){
+            line_num--;
+            if (line_num == 0) continue;
+            fprintf(fl2, "%s", line);
+        }
+        fclose(fl);
+        fclose(fl2);
+        remove(src);
+        rename(src2, src);
+        return 0;
     }
     if (isdir == 1){
         struct dirent *entry;
@@ -360,27 +390,7 @@ int add_to_staging(char *filepath) {
     char* src = find_source(filepath);
     strcat(src, "/staging/");
     strcat(src, pathto_(filepath));
-    FILE *file = fopen(src, "w");
-    if (file == NULL) return 1;
-    char line[MAX_LINE_LENGTH];
-    while (fgets(line, sizeof(line), file) != NULL) {
-        int length = strlen(line);
-
-        // remove '\n'
-        if (length > 0 && line[length - 1] == '\n') {
-            line[length - 1] = '\0';
-        }
-
-        if (strcmp(filepath, line) == 0) return 0;
-    }
-    fclose(file);
-    
-    file = fopen(src,"a");
-    if (file == NULL) return 1;
-
-    fprintf(file, "%s\n", filepath);
-    fclose(file);
-
+    copy_file(filepath, src);
     return 0;
 }
 
