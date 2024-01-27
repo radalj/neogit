@@ -11,6 +11,7 @@
 #define MAX_COMMIT_MESSAGE_LENGTH 2000
 #define MAX_LINE_LENGTH 1000
 #define MAX_MESSAGE_LENGTH 1000
+#define delete_message "this_file_has_been_deleted_goodbye_:/"
 
 #define debug(x) printf("%s", x);
 
@@ -35,6 +36,7 @@ int find_file_last_commit(char* filepath);
 int run_checkout(int argc, char *const argv[]);
 int find_file_last_change_before_commit(char *filepath, int commit_ID);
 int checkout_file(char *filepath, int commit_ID);
+int add_to_staging_deleted(char * filepath);
 
 void print_command(int argc, char * const argv[]) {
     for (int i = 0; i < argc; i++) {
@@ -330,9 +332,7 @@ int run_add(int argc, char *const argv[]) {
     }
 }
 
-int add_to_staging(char *filepath) {
-    int isdir = is_dir(filepath);
-    if (isdir == -1){
+int add_to_staging_deleted(char * filepath){
         char* src = find_source();
         char* src2 = find_source();
         strcat(src,"/tracks");
@@ -350,7 +350,6 @@ int add_to_staging(char *filepath) {
             }
         }
         if (exist == 0){
-            printf("There's no such file or directory\n!");
             return 1;
         }
         rewind(fl);
@@ -364,6 +363,22 @@ int add_to_staging(char *filepath) {
         fclose(fl2);
         remove(src);
         rename(src2, src);
+        src = find_source();
+        strcat(src,"/staging/");
+        strcat(src,pathto_(filepath));
+        fl = fopen(src, "w");
+        fprintf(fl, "%s\n", delete_message);
+        fclose(fl);   
+        return 0;
+}
+
+int add_to_staging(char *filepath) {
+    int isdir = is_dir(filepath);
+    if (isdir == -1){
+        if (add_to_staging_deleted(filepath)){
+            printf("there's no such file or folder!\n");
+            return 1;
+        }
         return 0;
     }
     if (isdir == 1){
@@ -387,10 +402,28 @@ int add_to_staging(char *filepath) {
         closedir(dir);
         return fl;
     }
-    char* src = find_source(filepath);
-    strcat(src, "/staging/");
-    strcat(src, pathto_(filepath));
-    copy_file(filepath, src);
+    char* des = find_source(filepath);
+    strcat(des, "/staging/");
+    strcat(des, pathto_(filepath));
+    char* track = find_source();
+    strcat(track, "/tracks");
+    FILE* trck = fopen(track, "r");
+    char line[1000];
+    bool exist = 0;
+    while (fgets(line,1000, trck) != NULL){
+        line[strlen(line) - 1] = '\0';
+        if (strcmp(line, filepath) == 0){
+            exist = 1;
+            break;
+        }
+    }
+    fclose(trck);
+    if (exist == 0){
+        trck = fopen(track, "a");
+        fprintf(trck, "%s\n", filepath);
+        fclose(trck);
+    }
+    copy_file(filepath, des);
     return 0;
 }
 
