@@ -53,6 +53,16 @@ char * find_source(){
     return ret;
 }
 
+char * pathto_(char * filepath){
+    int ln = strlen(filepath);
+    char * ans = (char *)malloc(ln);
+    for (int i = 0; i < ln; i++){
+        if (filepath[i] == '/') ans[i] = '_';
+        else ans[i] = filepath[i];
+    }
+    return ans;
+}
+
 void copy_file(char *src,char * des){
     FILE * s = fopen(src, "r");
     FILE * d = fopen(des, "w");
@@ -293,8 +303,7 @@ int create_configs(char *username, char *email) {
     // create files folder
     if (mkdir(".neogit/files", 0755) != 0) return 1;
 
-    file = fopen(".neogit/staging", "w");
-    fclose(file);
+    if (mkdir(".neogit/staging", 0755) != 0) return 1;
 
     copy_file("/home/radal/.base/commands",".neogit/commands");
 
@@ -324,14 +333,15 @@ int run_add(int argc, char *const argv[]) {
 int add_to_staging(char *filepath) {
     int isdir = is_dir(filepath);
     if (isdir == -1){
-        perror("There's no such file or directory");
+        printf("There's no such file or directory\n!");
         return 1;
     }
     if (isdir == 1){
         struct dirent *entry;
         DIR *dir = opendir(filepath);
         if (dir == NULL){
-            perror("Error opening directory");
+            printf("Error opening directory\n!");
+            return 1;
         }
         int len = strlen(filepath);
         filepath[len] = '/';
@@ -348,9 +358,9 @@ int add_to_staging(char *filepath) {
         return fl;
     }
     char* src = find_source(filepath);
-    src = (char *)realloc(src, strlen(src) + 10);
-    strcat(src, "/staging");
-    FILE *file = fopen(src, "r");
+    strcat(src, "/staging/");
+    strcat(src, pathto_(filepath));
+    FILE *file = fopen(src, "w");
     if (file == NULL) return 1;
     char line[MAX_LINE_LENGTH];
     while (fgets(line, sizeof(line), file) != NULL) {
