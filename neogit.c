@@ -336,7 +336,6 @@ int add_to_staging_deleted(char * filepath){
         char* src = find_source();
         char* src2 = find_source();
         strcat(src,"/tracks");
-        strcat(src2,"/tracks2");
         FILE* fl = fopen(src, "r");
         char line[2000]; 
         bool exist = 0;
@@ -352,17 +351,6 @@ int add_to_staging_deleted(char * filepath){
         if (exist == 0){
             return 1;
         }
-        rewind(fl);
-        FILE* fl2 = fopen(src2, "w");
-        while (fgets(line, 2000, fl) != NULL){
-            line_num--;
-            if (line_num == 0) continue;
-            fprintf(fl2, "%s", line);
-        }
-        fclose(fl);
-        fclose(fl2);
-        remove(src);
-        rename(src2, src);
         src = find_source();
         strcat(src,"/staging/");
         strcat(src,pathto_(filepath));
@@ -447,59 +435,31 @@ int run_reset(int argc, char *const argv[]) {
 }
 
 int remove_from_staging(char *filepath) {
-    int isdir = is_dir(filepath);
-    if (isdir == -1){
-        perror("There's no such file or directory");
+    char * src = find_source(filepath);
+    if (src == NULL){
+        printf("neogit storage not found!\n");
         return 1;
     }
-    if (isdir == 1){
-        struct dirent *entry;
-        DIR *dir = opendir(filepath);
-        if (dir == NULL){
-            perror("Error opening directory");
-        }
-        int len = strlen(filepath);
-        filepath[len] = '/';
-        filepath[len + 1] = '\0';
-        bool fl = 0;
-        while ((entry = readdir(dir)) != NULL){
-            if (strcmp(entry->d_name,".") == 0) continue;
-            if (strcmp(entry->d_name,"..") == 0) continue;
-            strcat(filepath,entry->d_name);
-            fl |= remove_from_staging(filepath);
-            filepath[len+1] = '\0';
-        }
-        closedir(dir);
-        return fl;
-    }
-    char* src = find_source();
-    char* tmp_src = (char *)calloc(1000,1);
-    strcpy(tmp_src, src);
     strcat(src, "/staging");
-    strcat(tmp_src, "/tmp_staging");
-    FILE *file = fopen(src, "r");
-    if (file == NULL) return 1;
-    
-    FILE *tmp_file = fopen(tmp_src, "w");
-    if (tmp_file == NULL) return 1;
-
-    char line[MAX_LINE_LENGTH];
-    while (fgets(line, sizeof(line), file) != NULL) {
-        int length = strlen(line);
-
-        // remove '\n'
-        if (length > 0 && line[length - 1] == '\n') {
-            line[length - 1] = '\0';
-        }
-
-        if (strcmp(filepath, line) != 0) fprintf(tmp_file, "%s\n", line);
+    char fake[2024];
+    strcpy(fake, src);
+    strcat(fake, "/");
+    struct dirent * entry;
+    DIR *dir = opendir(src);
+    if (dir == NULL){
+        printf("Error opening staging!\n");
+        return 1;
     }
-    fclose(file);
-    fclose(tmp_file);
-
-    remove(src);
-    rename(tmp_src, src);
-    return 0;
+    char* under = pathto_(filepath);
+    int ln = strlen(fake);
+    while ((entry = readdir(dir)) != NULL){
+        if (strncmp(under, entry->d_name, strlen(filepath)) == 0){
+            strcat(fake, entry->d_name);
+            remove(fake);
+            fake[ln] = '\0';
+        }
+    }
+    closedir(dir);
 }
 
 int run_commit(int argc, char * const argv[]) {
