@@ -76,6 +76,35 @@ void copy_file(char *src,char * des){
     fclose(s);
 }
 
+void copy_folder(char *src, char* des){
+    struct dirent *entry;
+    DIR * dir = opendir(des);
+    char tmp[2024];
+    strcpy(tmp,des);
+    strcat(tmp,"/");
+    int ln = strlen(tmp);
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name,".") == 0 || strcmp(entry->d_name,"..") == 0) continue;
+        strcat(tmp,entry->d_name);
+        remove(tmp);
+        tmp[ln] = '\0';
+    } 
+    closedir(dir);
+    dir = opendir(src);
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name,".") == 0 || strcmp(entry->d_name,"..") == 0) continue;
+        char addr[2024],addr2[2024];
+        strcpy(addr, src);
+        strcpy(addr2, des);
+        strcat(addr, "/");
+        strcat(addr2, "/");
+        strcat(addr, entry->d_name);
+        strcat(addr2, entry->d_name);
+        copy_file(addr, addr2);
+    }
+    closedir(dir);
+}
+
 int add_to_line(char * src,char* word, char* key){
     FILE * com = fopen(src, "r");
     if (com == NULL) return 0;
@@ -305,7 +334,18 @@ int create_configs(char *username, char *email) {
     // create files folder
     if (mkdir(".neogit/files", 0755) != 0) return 1;
 
-    if (mkdir(".neogit/staging", 0755) != 0) return 1;
+    for (int i = 0; i <= 10; i++){
+        char src[50];
+        strcpy(src, ".neogit/staging_");
+        if (i < 10){
+            char c[2];
+            c[0] = (char)(i + '0');
+            c[1] = '\0';
+            strcat(src,c);
+        }
+        else strcat(src,"10");
+        if (mkdir(src, 0755) != 0) return 1;
+    }
 
     copy_file("/home/radal/.base/commands",".neogit/commands");
 
@@ -324,6 +364,21 @@ int run_add(int argc, char *const argv[]) {
     }
 
     if (argv[2][0] != '-' || isf){
+        char* des = find_source();
+        strcat(des, "/staging_");
+        char src[2024];
+        strcpy(src, des);
+        int ln = strlen(des);
+        strcat(des,"10");
+        strcat(src,"9");
+        int i = 9;
+        do{
+            copy_folder(src,des);
+            strcpy(des, src);
+            des[ln + 1] = '\0';
+            i--;
+            src[ln] = (char)('0' + i);
+        }while (i >= 0);
         bool fl = 0;
         for (int i = 2 + isf; i < argc; i++){
             fl |= add_to_staging(abs_path(argv[i]));
@@ -334,7 +389,6 @@ int run_add(int argc, char *const argv[]) {
 
 int add_to_staging_deleted(char * filepath){
         char* src = find_source();
-        char* src2 = find_source();
         strcat(src,"/tracks");
         FILE* fl = fopen(src, "r");
         char line[2000]; 
@@ -352,7 +406,7 @@ int add_to_staging_deleted(char * filepath){
             return 1;
         }
         src = find_source();
-        strcat(src,"/staging/");
+        strcat(src,"/staging_0/");
         strcat(src,pathto_(filepath));
         fl = fopen(src, "w");
         fprintf(fl, "%s\n", delete_message);
@@ -391,7 +445,7 @@ int add_to_staging(char *filepath) {
         return fl;
     }
     char* des = find_source(filepath);
-    strcat(des, "/staging/");
+    strcat(des, "/staging_0/");
     strcat(des, pathto_(filepath));
     char* track = find_source();
     strcat(track, "/tracks");
@@ -417,6 +471,27 @@ int add_to_staging(char *filepath) {
 
 int run_reset(int argc, char *const argv[]) {
     // TODO: handle command in non-root directories 
+    if (argc == 3 && strcmp(argv[2], "-undo") == 0){
+        char* src;
+        char* des;
+        src = find_source();
+        des = find_source();
+        strcat(src,"/staging_1");
+        strcat(des,"/staging_0");
+        int i = 1;
+        int ln = strlen(des);
+        while(i <= 10){
+            copy_folder(src,des);
+            strcpy(des,src);
+            i++;
+            if (i < 10) src[ln - 1] = (char)('0' + i);
+            else{
+                src[ln-1] = '1';
+                src[ln] = '0';
+                src[ln + 1] = '\0';
+            }
+        }
+    }
     bool isf = (strcmp(argv[2], "-f") == 0);
     if (argc < 3 + isf) {
         printf("please specify a file\n");
@@ -440,7 +515,7 @@ int remove_from_staging(char *filepath) {
         printf("neogit storage not found!\n");
         return 1;
     }
-    strcat(src, "/staging");
+    strcat(src, "/staging_0");
     char fake[2024];
     strcpy(fake, src);
     strcat(fake, "/");
@@ -744,7 +819,6 @@ int main(int argc, char *argv[]) {
     fclose(fl);
     if (command[0] == '\0'){
         char* dir = find_source();
-        dir = realloc(dir, strlen(dir)+20);
         strcat(dir,"/commands");
         fl = fopen(dir, "r");
         while(fgets(line, 1000, fl) != NULL){
