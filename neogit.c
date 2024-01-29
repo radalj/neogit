@@ -68,12 +68,13 @@ char * pathto_(char * filepath){
 void copy_file(char *src,char * des){
     FILE * s = fopen(src, "r");
     FILE * d = fopen(des, "w");
-    char * c = (char *)malloc(1000);
-    while (fgets(c, 1000, s) != NULL){
-        fprintf(d,"%s",c);
+    char * line = (char *)malloc(1000);
+    while (fgets(line, 1000, s) != NULL){
+        fprintf(d,"%s",line);
     }
     fclose(d);
     fclose(s);
+    free(line);
 }
 
 void copy_folder(char *src, char* des){
@@ -308,8 +309,6 @@ int run_init(int argc, char * const argv[]) {
         FILE* list = fopen("/home/radal/.base/list", "a");
         fprintf(list,"%s\n",cwd);
         fclose(list);
-        list = fopen("home/radal/.base/config", "r");
-
         return create_configs("radin", "radinjarireh@gmail.com");
     }
     printf("neogit repository has already initialized\n");
@@ -388,27 +387,13 @@ int run_add(int argc, char *const argv[]) {
 }
 
 int add_to_staging_deleted(char * filepath){
-        char* src = find_source();
-        strcat(src,"/tracks");
-        FILE* fl = fopen(src, "r");
-        char line[2000]; 
-        bool exist = 0;
-        int line_num = 0;
-        while (fgets(line, 2000, fl) != NULL){
-            line[strlen(line) - 1] = '\0';
-            line_num++;
-            if (strcmp(line, filepath) == 0){
-                exist = 1;
-                break;
-            }
-        }
-        if (exist == 0){
+        if (is_tracked(filepath) == 0){
             return 1;
         }
-        src = find_source();
+        char* src = find_source();
         strcat(src,"/staging_0/");
         strcat(src,pathto_(filepath));
-        fl = fopen(src, "w");
+        FILE* fl = fopen(src, "w");
         fprintf(fl, "%s\n", delete_message);
         fclose(fl);   
         return 0;
@@ -447,24 +432,7 @@ int add_to_staging(char *filepath) {
     char* des = find_source(filepath);
     strcat(des, "/staging_0/");
     strcat(des, pathto_(filepath));
-    char* track = find_source();
-    strcat(track, "/tracks");
-    FILE* trck = fopen(track, "r");
-    char line[1000];
-    bool exist = 0;
-    while (fgets(line,1000, trck) != NULL){
-        line[strlen(line) - 1] = '\0';
-        if (strcmp(line, filepath) == 0){
-            exist = 1;
-            break;
-        }
-    }
-    fclose(trck);
-    if (exist == 0){
-        trck = fopen(track, "a");
-        fprintf(trck, "%s\n", filepath);
-        fclose(trck);
-    }
+    track_file(filepath);
     copy_file(filepath, des);
     return 0;
 }
@@ -539,17 +507,33 @@ int remove_from_staging(char *filepath) {
 
 int run_commit(int argc, char * const argv[]) {
     if (argc < 4) {
-        perror("please use the correct format");
+        fprintf(stderr,"please use the correct format!\n");
         return 1;
     }
-    
+
+    int ind = 3;
     char message[MAX_MESSAGE_LENGTH];
-    strcpy(message, argv[3]);
+    message[0] = '\0';
+    int cur_size = 0;
+    while (ind < argc){
+        int ln = strlen(argv[ind]);
+        if (ln + cur_size > 72){
+            fprintf(stderr,"message is too long\n");
+            return 1;
+        }
+        cur_size += ln;
+        strcat(message, argv[ind]);
+        if (argc != ind + 1){
+             strcat(message, " ");
+             cur_size++;
+        }
+        ind++;
+    }
 
     int commit_ID = inc_last_commit_ID();
     if (commit_ID == -1) return 1;
     
-    FILE *file = fopen(".neogit/staging", "r");
+    FILE *file = fopen(".neogit/staging_0", "r");
     if (file == NULL) return 1;
     char line[MAX_LINE_LENGTH];
     while (fgets(line, sizeof(line), file) != NULL) {
@@ -656,15 +640,18 @@ int commit_staged_file(int commit_ID, char* filepath) {
 
 int track_file(char *filepath) {
     if (is_tracked(filepath)) return 0;
-
-    FILE *file = fopen(".neogit/tracks", "a");
+    char* src = find_source();
+    strcat(src, "/tracks");
+    FILE *file = fopen(src, "a");
     if (file == NULL) return 1;
     fprintf(file, "%s\n", filepath);
     return 0;
 }
 
 bool is_tracked(char *filepath) {
-    FILE *file = fopen(".neogit/tracks", "r");
+    char * src = find_source();
+    strcat(src,"/tracks");
+    FILE *file = fopen(src, "r");
     if (file == NULL) return false;
     char line[MAX_LINE_LENGTH];
     while (fgets(line, sizeof(line), file) != NULL) {
