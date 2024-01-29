@@ -13,13 +13,13 @@
 #define MAX_MESSAGE_LENGTH 1000
 #define delete_message "this_file_has_been_deleted_goodbye_:/"
 
-#define debug(x) printf("%s", x);
+#define debug(x) printf("%s\n", x);
 
 
 int create_configs(char *username, char *email);
 
 int run_add(int argc, char * const argv[]);
-int add_to_staging(char *filepath);
+int add_to_staging(char *filepath,int num);
 
 int run_reset(int argc, char * const argv[]);
 int remove_from_staging(char *filepath);
@@ -37,6 +37,28 @@ int run_checkout(int argc, char *const argv[]);
 int find_file_last_change_before_commit(char *filepath, int commit_ID);
 int checkout_file(char *filepath, int commit_ID);
 int add_to_staging_deleted(char * filepath);
+
+char* numtostr(int num){
+    char *ans = (char *)malloc(10);
+    if (num == 0){
+        ans[0] = '0';
+        ans[1] = '\0';
+        return ans;
+    }
+    int i = 0;
+    while (num){
+        ans[i] = (char)(num%10 + '0');
+        num /= 10;
+        i++;
+    }
+    ans[i] = '\0';
+    for (int j = 0; j < i - j - 1; j++){
+        char k = ans[j];
+        ans[j] = ans[i - j - 1];
+        ans[i - j - 1] = k;
+    }
+    return ans;
+}
 
 void print_command(int argc, char * const argv[]) {
     for (int i = 0; i < argc; i++) {
@@ -57,11 +79,12 @@ char * find_source(){
 
 char * pathto_(char * filepath){
     int ln = strlen(filepath);
-    char * ans = (char *)malloc(ln);
+    char * ans = (char *)malloc(ln + 1);
     for (int i = 0; i < ln; i++){
         if (filepath[i] == '/') ans[i] = '_';
         else ans[i] = filepath[i];
     }
+    ans[ln] = '\0';
     return ans;
 }
 
@@ -150,6 +173,16 @@ int add_to_line(char * src,char* word, char* key){
     fclose(com2);
     remove(des);
     return 1;
+}
+
+bool find_in_file(char * filepath, char* path,int num){
+    char line[1000];
+    FILE * file = fopen(filepath, "r");
+    while (fgets(line, 1000, file) != NULL){
+        line[strlen(line) - 1] = '\0';
+        if (strncmp(line, path, num) == 0) return 1;
+    }
+    return 0;
 }
 
 char* abs_path(char* path){
@@ -326,6 +359,9 @@ int create_configs(char *username, char *email) {
     fprintf(file, "branch: %s", "master");
 
     fclose(file);
+
+    //all files folder
+    if (mkdir(".neogit/all", 0755) != 0) return 1;
     
     // create commits folder
     if (mkdir(".neogit/commits", 0755) != 0) return 1;
@@ -343,7 +379,8 @@ int create_configs(char *username, char *email) {
             strcat(src,c);
         }
         else strcat(src,"10");
-        if (mkdir(src, 0755) != 0) return 1;
+        file = fopen(src, "w");
+        fclose(file);
     }
 
     copy_file("/home/radal/.base/commands",".neogit/commands");
@@ -351,11 +388,16 @@ int create_configs(char *username, char *email) {
     file = fopen(".neogit/tracks", "w");
     fclose(file);
 
+    file = fopen(".neogit/deleted", "w");
+    fclose(file);
+
+    file = fopen(".neogit/addnum", "w");
+    fprintf(file, "%d\n", 0);
+    fclose(file);
     return 0;
 }
 
 int run_add(int argc, char *const argv[]) {
-    // TODO: handle command in non-root directories 
     bool isf = (strcmp(argv[2], "-f") == 0);
     if (argc < 3 + isf) {
         printf("please specify a file\n");
@@ -372,15 +414,25 @@ int run_add(int argc, char *const argv[]) {
         strcat(src,"9");
         int i = 9;
         do{
-            copy_folder(src,des);
+            copy_file(src,des);
             strcpy(des, src);
             des[ln + 1] = '\0';
             i--;
             src[ln] = (char)('0' + i);
         }while (i >= 0);
         bool fl = 0;
+        des = find_source();
+        strcat(des, "/addnum");
+        FILE * file = fopen(des, "r");
+        int num;
+        fscanf(file, "%d", &num);
+        fclose(file);
+        file = fopen(des, "w");
+        num++;
+        fprintf(file,"%d\n",num);
+        fclose(file);
         for (int i = 2 + isf; i < argc; i++){
-            fl |= add_to_staging(abs_path(argv[i]));
+            fl |= add_to_staging(abs_path(argv[i]),num);
         }
         return fl;
     }
@@ -391,15 +443,15 @@ int add_to_staging_deleted(char * filepath){
             return 1;
         }
         char* src = find_source();
-        strcat(src,"/staging_0/");
-        strcat(src,pathto_(filepath));
-        FILE* fl = fopen(src, "w");
-        fprintf(fl, "%s\n", delete_message);
+        strcat(src,"/deleted");
+        if (find_in_file(src, filepath, 1000)) return 0;
+        FILE* fl = fopen(src, "a");
+        fprintf(fl, "%s\n", filepath);
         fclose(fl);   
         return 0;
 }
 
-int add_to_staging(char *filepath) {
+int add_to_staging(char *filepath,int num) {
     int isdir = is_dir(filepath);
     if (isdir == -1){
         if (add_to_staging_deleted(filepath)){
@@ -423,22 +475,48 @@ int add_to_staging(char *filepath) {
             if (strcmp(entry->d_name,".") == 0) continue;
             if (strcmp(entry->d_name,"..") == 0) continue;
             strcat(filepath,entry->d_name);
-            fl |= add_to_staging(filepath);
-            filepath[len+1] = '\0';
+            fl |= add_to_staging(filepath, num);
+            filepath[len + 1] = '\0';
         }
         closedir(dir);
         return fl;
     }
-    char* des = find_source(filepath);
-    strcat(des, "/staging_0/");
+    char* des = find_source();
+    char* src = find_source();
+    strcat(des, "/all/");
     strcat(des, pathto_(filepath));
-    track_file(filepath);
+    int ln = strlen(des);
+    strcat(des, numtostr(num));
     copy_file(filepath, des);
+    track_file(filepath);
+    strcat(src, "/staging_0");
+    if (find_in_file(src, des, ln)){
+        char line[1000];
+        char * tmp = find_source();
+        strcat(tmp,"/tmp");
+        FILE * file = fopen(src, "r");
+        FILE * file2 = fopen(tmp, "w");
+        while (fgets(line, 1000, file) != NULL){
+            line[strlen(line) - 1] = '\0';
+            if (strncmp(line,des,ln) == 0) continue;
+            fprintf(file2, "%s\n", line);
+        }
+        fclose(file);
+        fclose(file2);
+        remove(src);
+        rename(tmp, src);
+        free(tmp);
+    }
+    FILE * fil = fopen(src, "a");
+    fprintf(fil, "%s\n", des);
+    fclose(fil);
+    free(des);
+    free(src);
     return 0;
 }
 
 int run_reset(int argc, char *const argv[]) {
-    // TODO: handle command in non-root directories 
+            // TODO: handle command in non-root directories 
     if (argc == 3 && strcmp(argv[2], "-undo") == 0){
         char* src;
         char* des;
@@ -651,23 +729,7 @@ int track_file(char *filepath) {
 bool is_tracked(char *filepath) {
     char * src = find_source();
     strcat(src,"/tracks");
-    FILE *file = fopen(src, "r");
-    if (file == NULL) return false;
-    char line[MAX_LINE_LENGTH];
-    while (fgets(line, sizeof(line), file) != NULL) {
-        int length = strlen(line);
-
-        // remove '\n'
-        if (length > 0 && line[length - 1] == '\n') {
-            line[length - 1] = '\0';
-        }
-        
-        if (strcmp(line, filepath) == 0) return true;
-
-    }
-    fclose(file); 
-
-    return false;
+    return find_in_file(src,filepath,1000);
 }
 
 int create_commit_file(int commit_ID, char *message) {
