@@ -448,6 +448,26 @@ int add_to_staging_deleted(char * filepath){
         FILE* fl = fopen(src, "a");
         fprintf(fl, "%s\n", filepath);
         fclose(fl);   
+        src = find_source();
+        strcat(src,"/all/");
+        strcat(src,pathto_(filepath));
+        char* stg = find_source();
+        strcat(stg, "/staging_0");
+        if (find_in_file(stg, src, strlen(src))){
+            char line[1000];
+            char * add = find_source();
+            strcat(add, "/tmp");
+            fl = fopen(stg, "r");
+            FILE *tmp = fopen(add, "w");
+            while(fgets(line, 1000, fl) != NULL){
+                if (strncmp(line, src, strlen(src)) == 0) continue;
+                fprintf(tmp, "%s", line);
+            }
+            fclose(tmp);
+            fclose(fl);
+            remove(stg);
+            rename(add, stg);
+        }
         return 0;
 }
 
@@ -516,7 +536,6 @@ int add_to_staging(char *filepath,int num) {
 }
 
 int run_reset(int argc, char *const argv[]) {
-            // TODO: handle command in non-root directories 
     if (argc == 3 && strcmp(argv[2], "-undo") == 0){
         char* src;
         char* des;
@@ -527,7 +546,7 @@ int run_reset(int argc, char *const argv[]) {
         int i = 1;
         int ln = strlen(des);
         while(i <= 10){
-            copy_folder(src,des);
+            copy_file(src,des);
             strcpy(des,src);
             i++;
             if (i < 10) src[ln - 1] = (char)('0' + i);
@@ -561,26 +580,44 @@ int remove_from_staging(char *filepath) {
         printf("neogit storage not found!\n");
         return 1;
     }
-    strcat(src, "/staging_0");
     char fake[2024];
     strcpy(fake, src);
-    strcat(fake, "/");
-    struct dirent * entry;
-    DIR *dir = opendir(src);
-    if (dir == NULL){
-        printf("Error opening staging!\n");
-        return 1;
+    strcat(src, "/staging_0");
+    strcat(fake, "/tmp");
+    FILE * fl = fopen(src, "r");
+    FILE * tmp = fopen(fake, "w");
+    char line[2024];
+    char * bad = find_source();
+    strcat(bad, "/all/");
+    strcat(bad,pathto_(filepath));
+    int ln = strlen(bad);
+    while (fgets(line, 1000, fl) != NULL){
+        if (strncmp(bad, line, ln) == 0) continue;
+        fprintf(tmp, "%s", line);
     }
-    char* under = pathto_(filepath);
-    int ln = strlen(fake);
-    while ((entry = readdir(dir)) != NULL){
-        if (strncmp(under, entry->d_name, strlen(filepath)) == 0){
-            strcat(fake, entry->d_name);
-            remove(fake);
-            fake[ln] = '\0';
-        }
+    fclose(fl);
+    fclose(tmp);
+    remove(src);
+    rename(fake, src);
+
+    src = find_source(filepath);
+    strcpy(fake, src);
+    strcat(src, "/deleted");
+    strcat(fake, "/tmp");
+    fl = fopen(src, "r");
+    tmp = fopen(fake, "w");
+    ln = strlen(filepath);
+    while (fgets(line, 1000, fl) != NULL){
+        debug("line : ");
+        debug(line);
+        if (strncmp(filepath, line, ln) == 0) continue;
+        fprintf(tmp, "%s", line);
     }
-    closedir(dir);
+    fclose(fl);
+    fclose(tmp);
+    remove(src);
+    rename(fake, src);
+    return 0;
 }
 
 int run_commit(int argc, char * const argv[]) {
