@@ -340,9 +340,11 @@ int run_init(int argc, char * const argv[]) {
     if (!exists) {
         if (mkdir(".neogit", 0755) != 0) return 1;
         printf("successfully initialized the project!\n");
-        FILE* list = fopen("/home/radal/.base/list", "a");
-        fprintf(list,"%s\n",cwd);
-        fclose(list);
+        if (find_in_file("/home/radal/.base/list", cwd, strlen(cwd)) == 0){
+            FILE * list = fopen("/home/radal/.base/list", "a");
+            fprintf(list,"%s\n",cwd);
+            fclose(list);
+        }
         return create_configs("radin", "radinjarireh@gmail.com");
     }
     printf("neogit repository has already initialized\n");
@@ -355,7 +357,7 @@ int create_configs(char *username, char *email) {
 
     fprintf(file, "username: %s\n", username);
     fprintf(file, "email: %s\n", email);
-    fprintf(file, "last_commit_ID: %d\n", 0);
+    fprintf(file, "last_commit_ID: %d\n", 10000);
     fprintf(file, "current_commit_ID: %d\n", 0);
     fprintf(file, "branch: %s\n", "master");
 
@@ -458,7 +460,10 @@ int add_to_staging_deleted(char * filepath){
         strcat(src,"/deleted_0");
         if (find_in_file(src, filepath, 1000)) return 0;
         FILE* fl = fopen(src, "a");
-        fprintf(fl, "%s\n", filepath);
+        char * pri = find_source();
+        strcat(pri, "/all/");
+        strcat(pri, pathto_(filepath)) ;
+        fprintf(fl, "%s\n", pri);
         fclose(fl);   
         src = find_source();
         strcat(src,"/all/");
@@ -667,7 +672,6 @@ int run_commit(int argc, char * const argv[]) {
     }
 
     int commit_ID = inc_last_commit_ID();
-    printf("%d\n",commit_ID);
     if (commit_ID == -1) return 1;
 
     char * src = find_source();
@@ -683,11 +687,18 @@ int run_commit(int argc, char * const argv[]) {
     struct  tm tm = *localtime(&t);
     fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
     fprintf(file, "MESSAGE : %s\n", message);
-    char chert[1000],user[1000], email[1000], branch[1000];
+    char chert[1000],user[1000], email[1000], branch[1000],par[1000];
     fscanf(file2, "%s %s", chert, user);
     fscanf(file2, "%s %s", chert, email);
     for (int i = 0; i < 5; i++) fscanf(file2, "%s", chert);
     fscanf(file2, "%s", branch);
+    char* head = find_source();
+    strcat(head, "/heads");
+    FILE * H = fopen(head, "r");
+    while(fscanf(H, "%s %s", chert, par) != EOF){
+        if (strcmp(chert, branch) == 0) break;
+    }
+    fclose(H);
     fprintf(file, "user : %s\n", user);
     fprintf(file, "email : %s\n", email);
     fprintf(file, "commit_id : %d\n", commit_ID);
@@ -695,25 +706,40 @@ int run_commit(int argc, char * const argv[]) {
     fclose(file2);
 
     int t_commit = 0;
-    src = find_source();
-    strcat(src, "/staging_0");
-    file2 = fopen(src, "r");
-    char line[1000];
-    while(fgets(line, 1000, file2)){
+    char* src_stage = find_source();
+    strcat(src_stage, "/staging_0");
+    file2 = fopen(src_stage, "r");
+    char line[2024];
+    while(fgets(line, 2024, file2) != NULL){
         t_commit++;
     }
     fclose(file2);
-    src = find_source();
-    strcat(src, "/deleted_0");
-    file2 = fopen(src, "r");
-    while(fgets(line, 1000, file2)){
+    char * src_deleted = find_source();
+    strcat(src_deleted, "/deleted_0");
+    file2 = fopen(src_deleted, "r");
+    while(fgets(line, 2024, file2) != NULL){
         t_commit++;
     }  
     fclose(file2);
-    fprintf(file, "commit number : %d\n", t_commit);
-
-    
-    fprintf(stdout, "commit successfully with commit ID %d", commit_ID);
+    fprintf(file, "number of commited files : %d\n", t_commit);    
+    fprintf(file, "par : %s\n", par);
+    char * last_commit = find_source();
+    strcat(last_commit, "/commits/");
+    strcat(last_commit, par);
+    FILE* lst = fopen(last_commit, "r");
+    while (fgets(line, 2024, lst) != NULL){
+        if (find_in_file(src_deleted, line, strlen(line) - 6)) continue;
+        if (find_in_file(src_stage, line, strlen(line) - 6)) continue;
+        fprintf(file, "%s", line);
+    }
+    fclose(lst);
+    file2 = fopen(src_stage, "r");
+    while (fgets(line, 2024, file2) != NULL){
+        fprintf(file, "%s", line);
+    }
+    fclose(file);
+    fclose(file2);
+    fprintf(stdout, "commit successfully with commit ID %d\n", commit_ID);
     
     return 0;
 }
