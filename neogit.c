@@ -370,25 +370,20 @@ int create_configs(char *username, char *email) {
     if (mkdir(".neogit/files", 0755) != 0) return 1;
 
     for (int i = 0; i <= 10; i++){
-        char src[50];
+        char src[50],del[50];
         strcpy(src, ".neogit/staging_");
-        if (i < 10){
-            char c[2];
-            c[0] = (char)(i + '0');
-            c[1] = '\0';
-            strcat(src,c);
-        }
-        else strcat(src,"10");
+        strcpy(del, ".neogit/deleted_");
+        strcat(src,numtostr(i));
+        strcat(del,numtostr(i));
         file = fopen(src, "w");
+        fclose(file);
+        file = fopen(del, "w");
         fclose(file);
     }
 
     copy_file("/home/radal/.base/commands",".neogit/commands");
 
     file = fopen(".neogit/tracks", "w");
-    fclose(file);
-
-    file = fopen(".neogit/deleted", "w");
     fclose(file);
 
     file = fopen(".neogit/addnum", "w");
@@ -406,19 +401,28 @@ int run_add(int argc, char *const argv[]) {
 
     if (argv[2][0] != '-' || isf){
         char* des = find_source();
+        char* des2 = find_source();
         strcat(des, "/staging_");
-        char src[2024];
+        strcat(des2, "/deleted_");
+        char src[2024],src2[2024];
         strcpy(src, des);
+        strcpy(src2, des2);
         int ln = strlen(des);
-        strcat(des,"10");
-        strcat(src,"9");
+        strcat(des, "10");
+        strcat(src, "9");
+        strcat(des2, "10");
+        strcat(src2, "9");
         int i = 9;
         do{
-            copy_file(src,des);
+            copy_file(src, des);
+            copy_file(src2, des2);
             strcpy(des, src);
+            strcpy(des2, src2);
             des[ln + 1] = '\0';
+            des2[ln + 1] = '\0';
             i--;
             src[ln] = (char)('0' + i);
+            src2[ln] = src[ln];
         }while (i >= 0);
         bool fl = 0;
         des = find_source();
@@ -443,7 +447,7 @@ int add_to_staging_deleted(char * filepath){
             return 1;
         }
         char* src = find_source();
-        strcat(src,"/deleted");
+        strcat(src,"/deleted_0");
         if (find_in_file(src, filepath, 1000)) return 0;
         FILE* fl = fopen(src, "a");
         fprintf(fl, "%s\n", filepath);
@@ -537,25 +541,36 @@ int add_to_staging(char *filepath,int num) {
 
 int run_reset(int argc, char *const argv[]) {
     if (argc == 3 && strcmp(argv[2], "-undo") == 0){
-        char* src;
-        char* des;
-        src = find_source();
-        des = find_source();
+        char* src = find_source();
+        char* des = find_source();
+        char* src2 = find_source();
+        char* des2 = find_source();
         strcat(src,"/staging_1");
         strcat(des,"/staging_0");
+        strcat(src2,"/deleted_1");
+        strcat(des2,"/deleted_0");
         int i = 1;
         int ln = strlen(des);
         while(i <= 10){
-            copy_file(src,des);
-            strcpy(des,src);
+            copy_file(src, des);
+            copy_file(src2, des2);
+            strcpy(des, src);
+            strcpy(des2, src2);
             i++;
-            if (i < 10) src[ln - 1] = (char)('0' + i);
+            if (i < 10){
+                src[ln - 1] = (char)('0' + i);
+                src2[ln - 1] = src[ln - 1];
+            }
             else{
-                src[ln-1] = '1';
+                src[ln - 1] = '1';
                 src[ln] = '0';
                 src[ln + 1] = '\0';
+                src2[ln - 1] = '1';
+                src2[ln] = '0';
+                src2[ln + 1] = '\0';
             }
         }
+        return 0;
     }
     bool isf = (strcmp(argv[2], "-f") == 0);
     if (argc < 3 + isf) {
@@ -602,14 +617,12 @@ int remove_from_staging(char *filepath) {
 
     src = find_source(filepath);
     strcpy(fake, src);
-    strcat(src, "/deleted");
+    strcat(src, "/deleted_0");
     strcat(fake, "/tmp");
     fl = fopen(src, "r");
     tmp = fopen(fake, "w");
     ln = strlen(filepath);
     while (fgets(line, 1000, fl) != NULL){
-        debug("line : ");
-        debug(line);
         if (strncmp(filepath, line, ln) == 0) continue;
         fprintf(tmp, "%s", line);
     }
@@ -658,7 +671,14 @@ int run_commit(int argc, char * const argv[]) {
         if (length > 0 && line[length - 1] == '\n') {
             line[length - 1] = '\0';
         }
-        
+
+        FILE* file2 = fopen(line, "r");
+        if (file2 == NULL){
+            fprintf(stderr, "Don't touch my stuff!\n");
+            return 1;
+        }
+        fclose(file2);
+
         if (!check_file_directory_exists(line)) {
             char dir_path[MAX_FILENAME_LENGTH];
             strcpy(dir_path, ".neogit/files/");
