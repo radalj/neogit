@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -356,7 +357,7 @@ int create_configs(char *username, char *email) {
     fprintf(file, "email: %s\n", email);
     fprintf(file, "last_commit_ID: %d\n", 0);
     fprintf(file, "current_commit_ID: %d\n", 0);
-    fprintf(file, "branch: %s", "master");
+    fprintf(file, "branch: %s\n", "master");
 
     fclose(file);
 
@@ -388,6 +389,13 @@ int create_configs(char *username, char *email) {
 
     file = fopen(".neogit/addnum", "w");
     fprintf(file, "%d\n", 0);
+    fclose(file);
+
+    file = fopen(".neogit/heads", "w");
+    fprintf(file,"master 0\n");
+    fclose(file);
+
+    file = fopen(".neogit/commits/0", "w");
     fclose(file);
     return 0;
 }
@@ -659,44 +667,52 @@ int run_commit(int argc, char * const argv[]) {
     }
 
     int commit_ID = inc_last_commit_ID();
+    printf("%d\n",commit_ID);
     if (commit_ID == -1) return 1;
-    
-    FILE *file = fopen(".neogit/staging_0", "r");
+
+    char * src = find_source();
+    char * des = find_source();
+    strcat(src, "/commits/");
+    strcat(src, numtostr(commit_ID));
+    strcat(des,"/config");
+    FILE * file = fopen(src, "w");
+    FILE * file2 = fopen(des, "r");
     if (file == NULL) return 1;
-    char line[MAX_LINE_LENGTH];
-    while (fgets(line, sizeof(line), file) != NULL) {
-        int length = strlen(line);
 
-        // remove '\n'
-        if (length > 0 && line[length - 1] == '\n') {
-            line[length - 1] = '\0';
-        }
+    time_t t = time(NULL);
+    struct  tm tm = *localtime(&t);
+    fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    fprintf(file, "MESSAGE : %s\n", message);
+    char chert[1000],user[1000], email[1000], branch[1000];
+    fscanf(file2, "%s %s", chert, user);
+    fscanf(file2, "%s %s", chert, email);
+    for (int i = 0; i < 5; i++) fscanf(file2, "%s", chert);
+    fscanf(file2, "%s", branch);
+    fprintf(file, "user : %s\n", user);
+    fprintf(file, "email : %s\n", email);
+    fprintf(file, "commit_id : %d\n", commit_ID);
+    fprintf(file, "branch : %s\n", branch);
+    fclose(file2);
 
-        FILE* file2 = fopen(line, "r");
-        if (file2 == NULL){
-            fprintf(stderr, "Don't touch my stuff!\n");
-            return 1;
-        }
-        fclose(file2);
-
-        if (!check_file_directory_exists(line)) {
-            char dir_path[MAX_FILENAME_LENGTH];
-            strcpy(dir_path, ".neogit/files/");
-            strcat(dir_path, line);
-            if (mkdir(dir_path, 0755) != 0) return 1;
-        }
-        printf("commit %s\n", line);
-        commit_staged_file(commit_ID, line);
-        track_file(line);
+    int t_commit = 0;
+    src = find_source();
+    strcat(src, "/staging_0");
+    file2 = fopen(src, "r");
+    char line[1000];
+    while(fgets(line, 1000, file2)){
+        t_commit++;
     }
-    fclose(file); 
-    
-    // free staging
-    file = fopen(".neogit/staging", "w");
-    if (file == NULL) return 1;
-    fclose(file);
+    fclose(file2);
+    src = find_source();
+    strcat(src, "/deleted_0");
+    file2 = fopen(src, "r");
+    while(fgets(line, 1000, file2)){
+        t_commit++;
+    }  
+    fclose(file2);
+    fprintf(file, "commit number : %d\n", t_commit);
 
-    create_commit_file(commit_ID, message);
+    
     fprintf(stdout, "commit successfully with commit ID %d", commit_ID);
     
     return 0;
@@ -704,10 +720,14 @@ int run_commit(int argc, char * const argv[]) {
 
 // returns new commit_ID
 int inc_last_commit_ID() {
-    FILE *file = fopen(".neogit/config", "r");
+    char * src = find_source();
+    char * des = find_source();
+    strcat(src, "/config");
+    FILE *file = fopen(src, "r");
     if (file == NULL) return -1;
     
-    FILE *tmp_file = fopen(".neogit/tmp_config", "w");
+    strcat(des, "/tmp_config");
+    FILE *tmp_file = fopen(des, "w");
     if (tmp_file == NULL) return -1;
 
     int last_commit_ID;
