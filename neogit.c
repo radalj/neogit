@@ -870,6 +870,141 @@ int find_file_last_commit(char* filepath) {
     return max;
 }
 
+bool is_val_branch(char * branch_name){
+    char* src = find_source();
+    strcat(src, "/heads");
+    FILE* file = fopen(src, "r");
+    char line[1000],name[500];
+    while (fgets(line, 1000, file) != NULL){
+        sscanf(line, "%s", name);
+        if (strcmp(branch_name, name) == 0) return 1;
+    }
+    fclose(file);
+    free(src);
+    return 0;
+}
+
+char * get_branch(char* commit_id){
+    char line[1000],tmp[20];
+    char *name = (char *)malloc(100);
+    char * src = find_source();
+    strcat(src, "/commits/");
+    strcat(src, commit_id);
+    FILE * file = fopen(src, "r");
+    for (int i = 0; i < 6; i++) fgets(line, 1000, file);
+    sscanf(line, "%s %s %s", tmp, tmp, name);
+    fclose(file);
+    free(src);
+    return name;
+}
+
+char * get_auth(char* commit_id){
+    char line[1000],tmp[20];
+    char *name = (char *)malloc(100);
+    char * src = find_source();
+    strcat(src, "/commits/");
+    strcat(src, commit_id);
+    FILE * file = fopen(src, "r");
+    for (int i = 0; i < 3; i++) fgets(line, 1000, file);
+    sscanf(line, "%s %s %s", tmp, tmp, name);
+    fclose(file);
+    free(src);
+    return name;
+}
+
+char * get_messaage(char* commit_id){
+    char* line = (char*) malloc(1000);
+    char * src = find_source();
+    strcat(src, "/commits/");
+    strcat(src, commit_id);
+    FILE * file = fopen(src, "r");
+    for (int i = 0; i < 2; i++) fgets(line, 1000, file);
+    fclose(file);
+    free(src);
+    return line + 10;
+}
+
+int run_log(int argc, char * const argv[]){
+    bool isbr = (strcmp("-branch", argv[2]) == 0);
+    bool isauth = (strcmp("-author", argv[2]) == 0);
+    if (isbr && is_val_branch(argv[3]) == 0){
+        fprintf(stderr,"Not a valid branch\n");
+        return 1;
+    }
+    if (argc == 3){
+        fprintf(stderr,"Invalid command\n");
+        return 1;
+    }
+    char* coms[1000];
+    int num = 0;
+    char *address = find_source();
+    if (address == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    strcat(address, "/commits");
+    DIR * dir = opendir(address);
+    struct dirent *entry;
+    if (argc == 2 || (argc == 4 && (strcmp("-n", argv[2]) == 0 || isbr || isauth))){
+        while ((entry = readdir(dir)) != NULL){
+            if (entry->d_type != DT_REG || strcmp(entry->d_name,"0") == 0) continue;
+            if (isbr && strcmp(argv[3], get_branch(entry->d_name)) != 0) continue;
+            if (isauth && strcmp(argv[3], get_auth(entry->d_name)) != 0) continue;
+            coms[num] = (char *)malloc(20);
+            strcpy(coms[num],entry->d_name);
+            num++;
+        }
+    }
+    else if(argc >= 4 && strcmp("-search", argv[2]) == 0){
+        while ((entry = readdir(dir)) != NULL){
+            if (entry->d_type != DT_REG || strcmp(entry->d_name,"0") == 0) continue;
+            bool ok = 0;
+            char * mess = get_messaage(entry->d_name);
+            for (int i = 3; i < argc; i++){
+                if (strstr(mess, argv[i]) != NULL){
+                    ok = 1;
+                    break;
+                }
+            }
+            if (ok){
+                coms[num] = (char *)malloc(20);
+                strcpy(coms[num],entry->d_name);
+                num++;
+            }
+        }
+    }
+    closedir(dir);
+    for (int i = 1; i < num; i++){
+        int j = i;
+        while (j > 0 && strcmp(coms[j], coms[j-1]) > 0){
+            char * tmp = coms[j];
+            coms[j] = coms[j-1];
+            coms[j-1] = tmp;
+            j--;
+        }
+    }
+    strcat(address,"/");
+    int ln = strlen(address);
+    char line[2024];
+    if (argc == 4 && strcmp(argv[2], "-n") == 0){
+        int n = atoi(argv[3]);
+        if (num > n) num = n;
+    }
+    for (int i = 0; i < num; i++){
+        strcat(address, coms[i]);
+        FILE * file = fopen(address, "r");
+        for (int j = 0; j < 7; j++){
+            fgets(line, 2024, file);
+            printf("%s", line);
+        }
+        printf("---------------------------------\n\n");
+        fclose(file);
+        address[ln] = '\0';
+    }
+    free(address);
+    return 0;        
+}
+
 int run_checkout(int argc, char * const argv[]) {
     if (argc < 3) return 1;
     
@@ -978,6 +1113,9 @@ int main(int argc, char *argv[]) {
     }
     if (strcmp(command, "commit") == 0) {
         return run_commit(argc, argv);
+    }
+    if (strcmp(command, "log") == 0){
+        return run_log(argc, argv);
     }
     if (strcmp(command, "checkout") == 0) {
         return run_checkout(argc, argv);
