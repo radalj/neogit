@@ -22,6 +22,7 @@ int remove_from_staging(char *filepath);
 int inc_last_commit_ID();
 int track_file(char *filepath);
 bool is_tracked(char *filepath);
+bool is_staged(char * path);
 
 
 char* numtostr(int num){
@@ -400,9 +401,31 @@ int create_configs(char *username, char *email) {
     return 0;
 }
 
+void dfs_on_files(char * path, int h){
+    int isdir = is_dir(path);
+    if (isdir == 0){
+        printf("%s : ", path);
+        if (is_staged(path)) printf("staged\n");
+        else printf("unstaged\n");
+        return;
+    }
+    if (h == 0) return;
+    DIR *dir = opendir(path);
+    struct dirent *entry;
+    int ln = strlen(path);
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        strcat(path,"/");
+        strcat(path, entry->d_name);
+        dfs_on_files(path, h - 1);
+        path[ln] = '\0';
+    }
+    closedir(dir); 
+}
+
 int run_add(int argc, char *const argv[]) {
-    bool isf = (strcmp(argv[2], "-f") == 0);
-    if (argc < 3 + isf) {
+    bool isf = (strcmp(argv[2], "-f") == 0),isn = (strcmp(argv[2], "-n") == 0);
+    if (argc < 3 + isf + isn){
         printf("please specify a file\n");
         return 1;
     }
@@ -447,6 +470,11 @@ int run_add(int argc, char *const argv[]) {
             fl |= add_to_staging(abs_path(argv[i]),num);
         }
         return fl;
+    }
+    if (strcmp(argv[2], "-n") == 0){
+        char cwd[MAX_LINE_LENGTH];
+        getcwd(cwd, MAX_LINE_LENGTH);
+        dfs_on_files(cwd, atoi(argv[3]));
     }
 }
 
@@ -552,6 +580,10 @@ int add_to_staging(char *filepath,int num) {
 }
 
 int run_reset(int argc, char *const argv[]) {
+    if (argc < 3){
+        fprintf(stderr, "Invalid format\n");
+        return 1;
+    }
     if (argc == 3 && strcmp(argv[2], "-undo") == 0){
         char* src = find_source();
         char* des = find_source();
