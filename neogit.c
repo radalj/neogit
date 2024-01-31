@@ -12,7 +12,6 @@
 #define MAX_COMMIT_MESSAGE_LENGTH 2000
 #define MAX_LINE_LENGTH 1000
 #define MAX_MESSAGE_LENGTH 1000
-#define delete_message "this_file_has_been_deleted_goodbye_:/"
 
 #define debug(x) printf("%s\n", x);
 
@@ -28,11 +27,10 @@ int remove_from_staging(char *filepath);
 int run_commit(int argc, char * const argv[]);
 int inc_last_commit_ID();
 bool check_file_directory_exists(char *filepath);
-int commit_staged_file(int commit_ID, char *filepath);
 int track_file(char *filepath);
 bool is_tracked(char *filepath);
-int create_commit_file(int commit_ID, char *message);
 int find_file_last_commit(char* filepath);
+int reset_staging();
 
 int run_checkout(int argc, char *const argv[]);
 int find_file_last_change_before_commit(char *filepath, int commit_ID);
@@ -646,6 +644,23 @@ int remove_from_staging(char *filepath) {
     return 0;
 }
 
+int reset_staging(){
+    for (int i = 0; i <= 10; i++){
+        char * stg = find_source();
+        char * del = find_source();
+        strcat(stg, "/staging_");
+        strcat(del, "/deleted_");
+        strcat(stg,numtostr(i));
+        strcat(del,numtostr(i));
+        FILE* file = fopen(stg, "w");
+        fclose(file);
+        file = fopen(del, "w");
+        fclose(file);
+        free(del);
+        free(stg);
+    }
+}
+
 int run_commit(int argc, char * const argv[]) {
     if (argc < 4) {
         fprintf(stderr,"please use the correct format!\n");
@@ -679,14 +694,11 @@ int run_commit(int argc, char * const argv[]) {
     strcat(src, "/commits/");
     strcat(src, numtostr(commit_ID));
     strcat(des,"/config");
-    FILE * file = fopen(src, "w");
     FILE * file2 = fopen(des, "r");
-    if (file == NULL) return 1;
+    if (file2 == NULL) return 1;
 
     time_t t = time(NULL);
     struct  tm tm = *localtime(&t);
-    fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
-    fprintf(file, "MESSAGE : %s\n", message);
     char chert[1000],user[1000], email[1000], branch[1000],par[1000];
     fscanf(file2, "%s %s", chert, user);
     fscanf(file2, "%s %s", chert, email);
@@ -699,10 +711,6 @@ int run_commit(int argc, char * const argv[]) {
         if (strcmp(chert, branch) == 0) break;
     }
     fclose(H);
-    fprintf(file, "user : %s\n", user);
-    fprintf(file, "email : %s\n", email);
-    fprintf(file, "commit_id : %d\n", commit_ID);
-    fprintf(file, "branch : %s\n", branch);
     fclose(file2);
 
     int t_commit = 0;
@@ -721,12 +729,26 @@ int run_commit(int argc, char * const argv[]) {
         t_commit++;
     }  
     fclose(file2);
+    if (t_commit == 0){
+        fprintf(stderr, "there's no staged file\n");
+        return 1;
+    }
+    //write commit info
+    FILE * file = fopen(src, "w");
+    fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    fprintf(file, "MESSAGE : %s\n", message);
+    fprintf(file, "user : %s\n", user);
+    fprintf(file, "email : %s\n", email);
+    fprintf(file, "commit_id : %d\n", commit_ID);
+    fprintf(file, "branch : %s\n", branch);
     fprintf(file, "number of commited files : %d\n", t_commit);    
     fprintf(file, "par : %s\n", par);
+    //write commit
     char * last_commit = find_source();
     strcat(last_commit, "/commits/");
     strcat(last_commit, par);
     FILE* lst = fopen(last_commit, "r");
+    if (strcmp(par,"0") != 0) for (int i = 0; i < 8; i++) fgets(line, 2024, lst);
     while (fgets(line, 2024, lst) != NULL){
         if (find_in_file(src_deleted, line, strlen(line) - 6)) continue;
         if (find_in_file(src_stage, line, strlen(line) - 6)) continue;
@@ -739,8 +761,27 @@ int run_commit(int argc, char * const argv[]) {
     }
     fclose(file);
     fclose(file2);
+    //change head
+    char* tmp = find_source();
+    strcat(tmp, "/tmp");
+    file2 = fopen(tmp, "w");
+    file = fopen(head, "r");
+    while (fgets(line, 2024, file) != NULL){
+        if (strncmp(line, branch, strlen(branch)) == 0)
+            fprintf(file2, "%s %d\n", branch, commit_ID);
+        else
+            fprintf(file2,"%s", line);
+    }
+    fclose(file2);
+    fclose(file);
+    remove(head);
+    rename(tmp, head);
+
+    if (reset_staging()) return 1;
+    free(tmp);
+    free(last_commit);
+    free(src_deleted);
     fprintf(stdout, "commit successfully with commit ID %d\n", commit_ID);
-    
     return 0;
 }
 
@@ -769,8 +810,10 @@ int inc_last_commit_ID() {
     fclose(file);
     fclose(tmp_file);
 
-    remove(".neogit/config");
-    rename(".neogit/tmp_config", ".neogit/config");
+    remove(src);
+    rename(des, src);
+    free(src);
+    free(des);
     return last_commit_ID;
 }
 
@@ -789,36 +832,6 @@ bool check_file_directory_exists(char *filepath) {
     return false;
 }
 
-int commit_staged_file(int commit_ID, char* filepath) {
-    FILE *read_file, *write_file;
-    char read_path[MAX_FILENAME_LENGTH];
-    strcpy(read_path, filepath);
-    char write_path[MAX_FILENAME_LENGTH];
-    strcpy(write_path, ".neogit/files/");
-    strcat(write_path, filepath);
-    strcat(write_path, "/");
-    char tmp[10];
-    sprintf(tmp, "%d", commit_ID);
-    strcat(write_path, tmp);
-
-    read_file = fopen(read_path, "r");
-    if (read_file == NULL) return 1;
-
-    write_file = fopen(write_path, "w");
-    if (write_file == NULL) return 1;
-
-    char buffer;
-    buffer = fgetc(read_file);
-    while(buffer != EOF) {
-        fputc(buffer, write_file);
-        buffer = fgetc(read_file);
-    }
-    fclose(read_file);
-    fclose(write_file);
-
-    return 0;
-}
-
 int track_file(char *filepath) {
     if (is_tracked(filepath)) return 0;
     char* src = find_source();
@@ -833,36 +846,6 @@ bool is_tracked(char *filepath) {
     char * src = find_source();
     strcat(src,"/tracks");
     return find_in_file(src,filepath,1000);
-}
-
-int create_commit_file(int commit_ID, char *message) {
-    char commit_filepath[MAX_FILENAME_LENGTH];
-    strcpy(commit_filepath, ".neogit/commits/");
-    char tmp[10];
-    sprintf(tmp, "%d", commit_ID);
-    strcat(commit_filepath, tmp);
-
-    FILE *file = fopen(commit_filepath, "w");
-    if (file == NULL) return 1;
-
-    fprintf(file, "message: %s\n", message);
-    fprintf(file, "files:\n");
-    
-    DIR *dir = opendir(".");
-    struct dirent *entry;
-    if (dir == NULL) {
-        perror("Error opening current directory");
-        return 1;
-    }
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_REG && is_tracked(entry->d_name)) {
-            int file_last_commit_ID = find_file_last_commit(entry->d_name);
-            fprintf(file, "%s %d\n", entry->d_name, file_last_commit_ID);
-        }
-    }
-    closedir(dir); 
-    fclose(file);
-    return 0;
 }
 
 int find_file_last_commit(char* filepath) {
