@@ -29,7 +29,6 @@ int inc_last_commit_ID();
 bool check_file_directory_exists(char *filepath);
 int track_file(char *filepath);
 bool is_tracked(char *filepath);
-int find_file_last_commit(char* filepath);
 int reset_staging();
 
 int run_checkout(int argc, char *const argv[]);
@@ -174,14 +173,14 @@ int add_to_line(char * src,char* word, char* key){
     return 1;
 }
 
-bool find_in_file(char * filepath, char* path,int num){
-    char line[1000];
+char * find_in_file(char * filepath, char* path,int num){
+    char * line = (char *)malloc(1000);
     FILE * file = fopen(filepath, "r");
     while (fgets(line, 1000, file) != NULL){
         line[strlen(line) - 1] = '\0';
-        if (strncmp(line, path, num) == 0) return 1;
+        if (strncmp(line, path, num) == 0) return line;
     }
-    return 0;
+    return NULL;
 }
 
 char* abs_path(char* path){
@@ -200,6 +199,19 @@ int is_dir(char* path){
     if (status != 0) return -1;
     if (S_ISREG(st_buf.st_mode)) return 0;
     if (S_ISDIR(st_buf.st_mode)) return 1;
+}
+
+char* get_head(char * branch){
+    char* head = find_source();
+    strcat(head, "/heads");
+    char * ans = (char *) malloc(100);
+    char chert[100];
+    FILE * H = fopen(head, "r");
+    while(fscanf(H, "%s %s", chert, ans) != EOF){
+        if (strcmp(chert, branch) == 0) break;
+    }
+    fclose(H);
+    return ans;   
 }
 
 void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
@@ -338,7 +350,7 @@ int run_init(int argc, char * const argv[]) {
     if (!exists) {
         if (mkdir(".neogit", 0755) != 0) return 1;
         printf("successfully initialized the project!\n");
-        if (find_in_file("/home/radal/.base/list", cwd, strlen(cwd)) == 0){
+        if (find_in_file("/home/radal/.base/list", cwd, strlen(cwd)) == NULL){
             FILE * list = fopen("/home/radal/.base/list", "a");
             fprintf(list,"%s\n",cwd);
             fclose(list);
@@ -456,7 +468,7 @@ int add_to_staging_deleted(char * filepath){
         }
         char* src = find_source();
         strcat(src,"/deleted_0");
-        if (find_in_file(src, filepath, 1000)) return 0;
+        if (find_in_file(src, filepath, 1000) != NULL) return 0;
         FILE* fl = fopen(src, "a");
         char * pri = find_source();
         strcat(pri, "/all/");
@@ -468,7 +480,7 @@ int add_to_staging_deleted(char * filepath){
         strcat(src,pathto_(filepath));
         char* stg = find_source();
         strcat(stg, "/staging_0");
-        if (find_in_file(stg, src, strlen(src))){
+        if (find_in_file(stg, src, strlen(src)) != NULL){
             char line[1000];
             char * add = find_source();
             strcat(add, "/tmp");
@@ -521,11 +533,12 @@ int add_to_staging(char *filepath,int num) {
     strcat(des, "/all/");
     strcat(des, pathto_(filepath));
     int ln = strlen(des);
+    strcat(des, "_");
     strcat(des, numtostr(num));
     copy_file(filepath, des);
     track_file(filepath);
     strcat(src, "/staging_0");
-    if (find_in_file(src, des, ln)){
+    if (find_in_file(src, des, ln) != NULL){
         char line[1000];
         char * tmp = find_source();
         strcat(tmp,"/tmp");
@@ -661,6 +674,166 @@ int reset_staging(){
     }
 }
 
+bool is_dif(char * path1, char* path2){
+    FILE * file1 = fopen(path1, "r");
+    FILE * file2 = fopen(path2, "r");
+    bool dif = 0;
+    char line[2024],line2[2024];
+    while (true){
+        bool isnl1 = (fgets(line, 2024, file1) == NULL);
+        bool isnl2 = (fgets(line2, 2024, file2) == NULL);
+        if (isnl1 != isnl2){
+            dif = 1;
+            break;
+        }
+        if (isnl1) break;
+        if (strcmp(line, line2) != 0){
+            dif = 1;
+            break;
+        }
+    }
+    fclose(file1);
+    fclose(file2);
+    return dif;
+}
+
+bool is_changed(char* path, char* last_commit){
+    char* src = find_source();
+    strcat(src,"/all/");
+    strcat(src,pathto_(path));
+    FILE* commit = fopen(last_commit, "r");
+    char line[2024];
+    bool exist = 0;
+    while (fgets(line, 2024, commit) != NULL){
+        line[strlen(line) - 1] = '\0';
+        if (strncmp(line, src, strlen(src)) == 0){
+            exist = 1;
+            break;
+        }
+    }
+    if (!exist){
+        fclose(commit);
+        return 1;
+    }
+    fclose(commit);
+    return is_dif(path, line);
+}
+
+bool is_staged(char * path){
+    char * src = find_source();
+    strcat(src, "/all/");
+    strcat(src, pathto_(path));
+    int ln = strlen(src);
+    char * stg = find_source();
+    strcat(stg, "/staging_0");
+    char * line = find_in_file(stg, src, ln);
+    if (line == NULL) return 0;
+    return !is_dif(line, path);
+}
+
+bool is_staged_del(char * path){
+    char * src = find_source();
+    strcat(src, "/all/");
+    strcat(src, pathto_(path));
+    int ln = strlen(src);
+    char * del = find_source();
+    strcat(del, "/deleted_0");
+    if (find_in_file(del, src, ln) != NULL) return 1;
+    return 0;
+}
+
+void check_status(char * path){
+    int isdir = is_dir(path);
+    if (isdir == 1){
+        DIR *dir = opendir(path);
+        struct dirent *entry;
+        int ln = strlen(path);
+        while ((entry = readdir(dir)) != NULL) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+            strcat(path,"/");
+            strcat(path, entry->d_name);
+            check_status(path);
+            path[ln] = '\0';
+        }
+        closedir(dir); 
+        return;
+    }
+    char * conf = find_source();
+    strcat(conf,"/config");
+    FILE * file = fopen(conf, "r");
+    char * line = (char *)malloc(2024);
+    for (int i = 0; i < 5; i++) fgets(line, 1000, file);
+    fclose(file);
+    char tmp[100],branch[100];
+    sscanf("%s %s", tmp, branch);
+    char * head = get_head(branch);
+    char * comm = find_source();
+    strcat(comm,"/commits/");
+    strcat(comm, head);
+    char * nw_path = find_source();
+    strcat(nw_path, "/all/");
+    strcat(nw_path, pathto_(path));
+    int ln = strlen(nw_path);
+    line = find_in_file(comm, nw_path, ln);
+    if (line == NULL){
+        if (is_staged(path)) printf("+A\n");
+        else printf("-A\n");
+        return;
+    }
+    if (!is_dif(line, path)) return;
+    printf("%s : ", path);
+    if (is_staged(path)) printf("+M\n");
+    else printf("-M\n");
+}
+
+int run_status(){
+    char * path = find_source();
+    strcat(path, "/files");
+    check_status(path);
+    char * conf = find_source();
+    strcat(conf,"/config");
+    FILE * file = fopen(conf, "r");
+    char * line = (char *)malloc(2024);
+    for (int i = 0; i < 5; i++) fgets(line, 1000, file);
+    fclose(file);
+    char tmp[100],branch[100];
+    sscanf("%s %s", tmp, branch);
+    char * head = get_head(branch);
+    char * comm = find_source();
+    strcat(comm,"/commits/");
+    strcat(comm, head);
+    file = fopen(comm, "r");
+    for (int i = 0; i < 8; i++) fgets(line, 2024, file);
+    while (fgets(line, 2024, file) != NULL){
+        int ln = strlen(line);
+        bool fst = 0;
+        for (int i = ln-1; i >= 0; i--){
+            if (line[i] == '/'){
+                line += (i + 1);
+                ln -= (i + 1);
+                break;
+            }
+            if (line[i] == '_'){
+                if (fst == 0){
+                    fst = 1;
+                    line[i] = '\0';
+                }
+                else line[i] = '/';
+            }
+        }
+        fst = '\0';
+        FILE * file2 = fopen(line, "r");
+        if (file2 == NULL){
+            printf("%s : ", path);
+            if (is_staged_del(path)) printf("+D\n");
+            else printf("-D\n");
+        }
+        else fclose(file2);
+    }
+    fclose(file);
+    return 0;
+}
+
 int run_commit(int argc, char * const argv[]) {
     if (argc < 4) {
         fprintf(stderr,"please use the correct format!\n");
@@ -699,18 +872,14 @@ int run_commit(int argc, char * const argv[]) {
 
     time_t t = time(NULL);
     struct  tm tm = *localtime(&t);
-    char chert[1000],user[1000], email[1000], branch[1000],par[1000];
+    char chert[1000],user[1000], email[1000], branch[1000];
     fscanf(file2, "%s %s", chert, user);
     fscanf(file2, "%s %s", chert, email);
     for (int i = 0; i < 5; i++) fscanf(file2, "%s", chert);
     fscanf(file2, "%s", branch);
     char* head = find_source();
     strcat(head, "/heads");
-    FILE * H = fopen(head, "r");
-    while(fscanf(H, "%s %s", chert, par) != EOF){
-        if (strcmp(chert, branch) == 0) break;
-    }
-    fclose(H);
+    char* par = get_head(branch);
     fclose(file2);
 
     int t_commit = 0;
@@ -750,8 +919,8 @@ int run_commit(int argc, char * const argv[]) {
     FILE* lst = fopen(last_commit, "r");
     if (strcmp(par,"0") != 0) for (int i = 0; i < 8; i++) fgets(line, 2024, lst);
     while (fgets(line, 2024, lst) != NULL){
-        if (find_in_file(src_deleted, line, strlen(line) - 6)) continue;
-        if (find_in_file(src_stage, line, strlen(line) - 6)) continue;
+        if (find_in_file(src_deleted, line, strlen(line) - 6) != NULL) continue;
+        if (find_in_file(src_stage, line, strlen(line) - 6) != NULL) continue;
         fprintf(file, "%s", line);
     }
     fclose(lst);
@@ -845,29 +1014,7 @@ int track_file(char *filepath) {
 bool is_tracked(char *filepath) {
     char * src = find_source();
     strcat(src,"/tracks");
-    return find_in_file(src,filepath,1000);
-}
-
-int find_file_last_commit(char* filepath) {
-    char filepath_dir[MAX_FILENAME_LENGTH];
-    strcpy(filepath_dir, ".neogit/files/");
-    strcat(filepath_dir, filepath);
-
-    int max = -1;
-    
-    DIR *dir = opendir(filepath_dir);
-    struct dirent *entry;
-    if (dir == NULL) return 1;
-
-    while((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_REG) {
-            int tmp = atoi(entry->d_name);
-            max = max > tmp ? max: tmp;
-        }
-    }
-    closedir(dir);
-
-    return max;
+    return (find_in_file(src,filepath,1000) != NULL);
 }
 
 bool is_val_branch(char * branch_name){
@@ -1110,6 +1257,9 @@ int main(int argc, char *argv[]) {
     }
     if (strcmp(command, "reset") == 0) {
         return run_reset(argc, argv);
+    }
+    if (strcmp(command, "status") == 0) {
+        return run_status();
     }
     if (strcmp(command, "commit") == 0) {
         return run_commit(argc, argv);
