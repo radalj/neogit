@@ -7,7 +7,7 @@
 #include <time.h>
 #include <sys/stat.h>
 
-#define MAX_LINE_LENGTH 1000
+#define MAX_LINE_LENGTH 2024
 #define MAX_MESSAGE_LENGTH 1000
 
 #define debug(x) printf("%s\n", x);
@@ -54,9 +54,9 @@ void print_command(int argc, char * const argv[]) {
 }
 
 char * find_source(){
-    char cwd[2024];
+    char cwd[MAX_LINE_LENGTH];
     if (getcwd(cwd, sizeof(cwd)) == NULL) return "NULL";
-    char* ret = (char *)malloc(2024);
+    char* ret = (char *)malloc(MAX_LINE_LENGTH);
     strcpy(ret, cwd);
     char* p = strstr(ret, ".neogit");
     p[7] = '\0';
@@ -89,7 +89,7 @@ void copy_file(char *src,char * des){
 void copy_folder(char *src, char* des){
     struct dirent *entry;
     DIR * dir = opendir(des);
-    char tmp[2024];
+    char tmp[MAX_LINE_LENGTH];
     strcpy(tmp,des);
     strcat(tmp,"/");
     int ln = strlen(tmp);
@@ -103,7 +103,7 @@ void copy_folder(char *src, char* des){
     dir = opendir(src);
     while ((entry = readdir(dir)) != NULL){
         if (strcmp(entry->d_name,".") == 0 || strcmp(entry->d_name,"..") == 0) continue;
-        char addr[2024],addr2[2024];
+        char addr[MAX_LINE_LENGTH],addr2[MAX_LINE_LENGTH];
         strcpy(addr, src);
         strcpy(addr2, des);
         strcat(addr, "/");
@@ -161,12 +161,12 @@ int add_to_line(char * src,char* word, char* key){
     return 1;
 }
 
-char * find_in_file(char * filepath, char* path,int num){
+char * find_in_file(char * src, char* key,int num){
     char * line = (char *)malloc(1000);
-    FILE * file = fopen(filepath, "r");
+    FILE * file = fopen(src, "r");
     while (fgets(line, 1000, file) != NULL){
         line[strlen(line) - 1] = '\0';
-        if (strncmp(line, path, num) == 0) return line;
+        if (strncmp(line, key, num) == 0) return line;
     }
     return NULL;
 }
@@ -412,7 +412,7 @@ int run_add(int argc, char *const argv[]) {
         char* des2 = find_source();
         strcat(des, "/staging_");
         strcat(des2, "/deleted_");
-        char src[2024],src2[2024];
+        char src[MAX_LINE_LENGTH],src2[MAX_LINE_LENGTH];
         strcpy(src, des);
         strcpy(src2, des2);
         int ln = strlen(des);
@@ -607,13 +607,13 @@ int remove_from_staging(char *filepath) {
         printf("neogit storage not found!\n");
         return 1;
     }
-    char fake[2024];
+    char fake[MAX_LINE_LENGTH];
     strcpy(fake, src);
     strcat(src, "/staging_0");
     strcat(fake, "/tmp");
     FILE * fl = fopen(src, "r");
     FILE * tmp = fopen(fake, "w");
-    char line[2024];
+    char line[MAX_LINE_LENGTH];
     char * bad = find_source();
     strcat(bad, "/all/");
     strcat(bad,pathto_(filepath));
@@ -666,10 +666,10 @@ bool is_dif(char * path1, char* path2){
     FILE * file1 = fopen(path1, "r");
     FILE * file2 = fopen(path2, "r");
     bool dif = 0;
-    char line[2024],line2[2024];
+    char line[MAX_LINE_LENGTH],line2[MAX_LINE_LENGTH];
     while (true){
-        bool isnl1 = (fgets(line, 2024, file1) == NULL);
-        bool isnl2 = (fgets(line2, 2024, file2) == NULL);
+        bool isnl1 = (fgets(line, MAX_LINE_LENGTH, file1) == NULL);
+        bool isnl2 = (fgets(line2, MAX_LINE_LENGTH, file2) == NULL);
         if (isnl1 != isnl2){
             dif = 1;
             break;
@@ -690,9 +690,9 @@ bool is_changed(char* path, char* last_commit){
     strcat(src,"/all/");
     strcat(src,pathto_(path));
     FILE* commit = fopen(last_commit, "r");
-    char line[2024];
+    char line[MAX_LINE_LENGTH];
     bool exist = 0;
-    while (fgets(line, 2024, commit) != NULL){
+    while (fgets(line, MAX_LINE_LENGTH, commit) != NULL){
         line[strlen(line) - 1] = '\0';
         if (strncmp(line, src, strlen(src)) == 0){
             exist = 1;
@@ -730,6 +730,21 @@ bool is_staged_del(char * path){
     return 0;
 }
 
+char * get_cur_branch(){
+    char * conf = find_source();
+    if (conf == NULL)
+        return NULL;
+    strcat(conf,"/config");
+    FILE * file = fopen(conf, "r");
+    char * line = (char *)malloc(MAX_LINE_LENGTH);
+    for (int i = 0; i < 5; i++) fgets(line, 1000, file);
+    fclose(file);
+    char tmp[100];
+    char * branch = (char *)malloc(100);
+    sscanf("%s %s", tmp, branch);   
+    return branch;
+}
+
 void check_status(char * path){
     int isdir = is_dir(path);
     if (isdir == 1){
@@ -746,19 +761,13 @@ void check_status(char * path){
         closedir(dir); 
         return;
     }
-    char * conf = find_source();
-    strcat(conf,"/config");
-    FILE * file = fopen(conf, "r");
-    char * line = (char *)malloc(2024);
-    for (int i = 0; i < 5; i++) fgets(line, 1000, file);
-    fclose(file);
-    char tmp[100],branch[100];
-    sscanf("%s %s", tmp, branch);
+    char * branch = get_cur_branch();
     char * head = get_head(branch);
     char * comm = find_source();
     strcat(comm,"/commits/");
     strcat(comm, head);
     char * nw_path = find_source();
+    char * line;
     strcat(nw_path, "/all/");
     strcat(nw_path, pathto_(path));
     int ln = strlen(nw_path);
@@ -776,23 +785,19 @@ void check_status(char * path){
 
 int run_status(){
     char * path = find_source();
-    strcat(path, "/files");
-    check_status(path);
-    char * conf = find_source();
-    strcat(conf,"/config");
-    FILE * file = fopen(conf, "r");
-    char * line = (char *)malloc(2024);
-    for (int i = 0; i < 5; i++) fgets(line, 1000, file);
-    fclose(file);
-    char tmp[100],branch[100];
-    sscanf("%s %s", tmp, branch);
+    if (path == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    char * branch = get_cur_branch();
     char * head = get_head(branch);
     char * comm = find_source();
     strcat(comm,"/commits/");
     strcat(comm, head);
-    file = fopen(comm, "r");
-    for (int i = 0; i < 8; i++) fgets(line, 2024, file);
-    while (fgets(line, 2024, file) != NULL){
+    char * line = (char*)malloc(MAX_LINE_LENGTH);
+    FILE * file = fopen(comm, "r");
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
         int ln = strlen(line);
         bool fst = 0;
         for (int i = ln-1; i >= 0; i--){
@@ -851,6 +856,10 @@ int run_commit(int argc, char * const argv[]) {
     if (commit_ID == -1) return 1;
 
     char * src = find_source();
+    if (src == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
     char * des = find_source();
     strcat(src, "/commits/");
     strcat(src, numtostr(commit_ID));
@@ -874,15 +883,15 @@ int run_commit(int argc, char * const argv[]) {
     char* src_stage = find_source();
     strcat(src_stage, "/staging_0");
     file2 = fopen(src_stage, "r");
-    char line[2024];
-    while(fgets(line, 2024, file2) != NULL){
+    char line[MAX_LINE_LENGTH];
+    while(fgets(line, MAX_LINE_LENGTH, file2) != NULL){
         t_commit++;
     }
     fclose(file2);
     char * src_deleted = find_source();
     strcat(src_deleted, "/deleted_0");
     file2 = fopen(src_deleted, "r");
-    while(fgets(line, 2024, file2) != NULL){
+    while(fgets(line, MAX_LINE_LENGTH, file2) != NULL){
         t_commit++;
     }  
     fclose(file2);
@@ -905,15 +914,15 @@ int run_commit(int argc, char * const argv[]) {
     strcat(last_commit, "/commits/");
     strcat(last_commit, par);
     FILE* lst = fopen(last_commit, "r");
-    if (strcmp(par,"0") != 0) for (int i = 0; i < 8; i++) fgets(line, 2024, lst);
-    while (fgets(line, 2024, lst) != NULL){
+    if (strcmp(par,"0") != 0) for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, lst);
+    while (fgets(line, MAX_LINE_LENGTH, lst) != NULL){
         if (find_in_file(src_deleted, line, strlen(line) - 6) != NULL) continue;
         if (find_in_file(src_stage, line, strlen(line) - 6) != NULL) continue;
         fprintf(file, "%s", line);
     }
     fclose(lst);
     file2 = fopen(src_stage, "r");
-    while (fgets(line, 2024, file2) != NULL){
+    while (fgets(line, MAX_LINE_LENGTH, file2) != NULL){
         fprintf(file, "%s", line);
     }
     fclose(file);
@@ -923,7 +932,7 @@ int run_commit(int argc, char * const argv[]) {
     strcat(tmp, "/tmp");
     file2 = fopen(tmp, "w");
     file = fopen(head, "r");
-    while (fgets(line, 2024, file) != NULL){
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
         if (strncmp(line, branch, strlen(branch)) == 0)
             fprintf(file2, "%s %d\n", branch, commit_ID);
         else
@@ -1105,7 +1114,7 @@ int run_log(int argc, char * const argv[]){
     }
     strcat(address,"/");
     int ln = strlen(address);
-    char line[2024];
+    char line[MAX_LINE_LENGTH];
     if (argc == 4 && strcmp(argv[2], "-n") == 0){
         int n = atoi(argv[3]);
         if (num > n) num = n;
@@ -1114,7 +1123,7 @@ int run_log(int argc, char * const argv[]){
         strcat(address, coms[i]);
         FILE * file = fopen(address, "r");
         for (int j = 0; j < 7; j++){
-            fgets(line, 2024, file);
+            fgets(line, MAX_LINE_LENGTH, file);
             printf("%s", line);
         }
         printf("---------------------------------\n\n");
@@ -1126,7 +1135,75 @@ int run_log(int argc, char * const argv[]){
 }
 
 int run_branch(int argc, char * const argv[]){
+    char * src = find_source();
+    if (src == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    strcat(src, "/heads");
+    if (argc == 2){
+        FILE * file = fopen(src, "r");
+        char line[MAX_LINE_LENGTH],name[MAX_LINE_LENGTH];
+        while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+            sscanf(line, "%s", name);
+            printf("%s\n",name);
+        }
+        fclose(file);
+        return 0;
+    }
+    if (argc != 3){
+        fprintf(stderr, "Wrong format!\n");
+        return 1;
+    }
+    if (find_in_file(src, argv[2], strlen(argv[2])) != NULL){
+        fprintf(stderr, "Branch already exists\n");
+        return 1;
+    }
+    char * branch = get_cur_branch();
+    char * head = get_head(branch);
+    src = find_source();
+    strcat(src, "/commits/");
+    char * dst = (char *)malloc(MAX_LINE_LENGTH);
+    char * conf = find_source();
+    strcat(conf, "/config");
+    strcpy(dst, src);
+    strcat(src, head);
+    int commit_ID = inc_last_commit_ID();
+    strcat(dst, numtostr(commit_ID));
+    FILE * file2 = fopen(dst, "w");
+    FILE * file_conf = fopen(conf, "r");
+    time_t t = time(NULL);
+    struct  tm tm = *localtime(&t);
+    char chert[1000],user[1000], email[1000];
+    fscanf(file_conf, "%s %s", chert, user);
+    fscanf(file_conf, "%s %s", chert, email);
+    fclose(file_conf);
+    //commit info
+    fprintf(file2, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    fprintf(file2, "MESSAGE : %s\n", "new branch created");
+    fprintf(file2, "user : %s\n", user);
+    fprintf(file2, "email : %s\n", email);
+    fprintf(file2, "commit_id : %d\n", commit_ID);
+    fprintf(file2, "branch : %s\n", argv[2]);
+    fprintf(file2, "number of commited files : %d\n", 0);    
+    fprintf(file2, "par : %s\n", head);
+    //commit files
+    FILE * file = fopen(src, "r");
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        fprintf(file2, "%s", line);
+    }
+    fclose(file);
+    fclose(file2);
 
+    // update heads
+    char * head_path = find_source();
+    strcat(head_path, "/heads");
+    file = fopen(head_path, "a");
+    fprintf(file, "%s %d\n", argv[2], commit_ID);
+    fclose(file);
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
