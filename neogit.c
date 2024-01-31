@@ -6,10 +6,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 
-#define MAX_FILENAME_LENGTH 1000
-#define MAX_COMMIT_MESSAGE_LENGTH 2000
 #define MAX_LINE_LENGTH 1000
 #define MAX_MESSAGE_LENGTH 1000
 
@@ -18,23 +15,14 @@
 
 int create_configs(char *username, char *email);
 
-int run_add(int argc, char * const argv[]);
 int add_to_staging(char *filepath,int num);
 
-int run_reset(int argc, char * const argv[]);
 int remove_from_staging(char *filepath);
 
-int run_commit(int argc, char * const argv[]);
 int inc_last_commit_ID();
-bool check_file_directory_exists(char *filepath);
 int track_file(char *filepath);
 bool is_tracked(char *filepath);
-int reset_staging();
 
-int run_checkout(int argc, char *const argv[]);
-int find_file_last_change_before_commit(char *filepath, int commit_ID);
-int checkout_file(char *filepath, int commit_ID);
-int add_to_staging_deleted(char * filepath);
 
 char* numtostr(int num){
     char *ans = (char *)malloc(10);
@@ -986,21 +974,6 @@ int inc_last_commit_ID() {
     return last_commit_ID;
 }
 
-bool check_file_directory_exists(char *filepath) {
-    DIR *dir = opendir(".neogit/files");
-    struct dirent *entry;
-    if (dir == NULL) {
-        perror("Error opening current directory");
-        return 1;
-    }
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_DIR && strcmp(entry->d_name, filepath) == 0) return true;
-    }
-    closedir(dir);
-
-    return false;
-}
-
 int track_file(char *filepath) {
     if (is_tracked(filepath)) return 0;
     char* src = find_source();
@@ -1152,70 +1125,8 @@ int run_log(int argc, char * const argv[]){
     return 0;        
 }
 
-int run_checkout(int argc, char * const argv[]) {
-    if (argc < 3) return 1;
-    
-    int commit_ID = atoi(argv[2]);
+int run_branch(int argc, char * const argv[]){
 
-    DIR *dir = opendir(".");
-    struct dirent *entry;
-    while((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_REG && is_tracked(entry->d_name)) {
-            checkout_file(entry->d_name, find_file_last_change_before_commit(entry->d_name, commit_ID));
-        }
-    }
-    closedir(dir);
-
-    return 0;
-}
-
-int find_file_last_change_before_commit(char *filepath, int commit_ID) {
-    char filepath_dir[MAX_FILENAME_LENGTH];
-    strcpy(filepath_dir, ".neogit/files/");
-    strcat(filepath_dir, filepath);
-
-    int max = -1;
-    
-    DIR *dir = opendir(filepath_dir);
-    struct dirent *entry;
-    if (dir == NULL) return 1;
-
-    while((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_REG) {
-            int tmp = atoi(entry->d_name);
-            if (tmp > max && tmp <= commit_ID) {
-                max = tmp;
-            }
-        }
-    }
-    closedir(dir);
-
-    return max;
-}
-
-int checkout_file(char *filepath, int commit_ID) {
-    char src_file[MAX_FILENAME_LENGTH];
-    strcpy(src_file, ".neogit/files/");
-    strcat(src_file, filepath);
-    char tmp[10];
-    sprintf(tmp, "/%d", commit_ID);
-    strcat(src_file, tmp);
-
-    FILE *read_file = fopen(src_file, "r");
-    if (read_file == NULL) return 1;
-    FILE *write_file = fopen(filepath, "w");
-    if (write_file == NULL) return 1;
-    
-    char line[MAX_LINE_LENGTH];
-
-    while (fgets(line, sizeof(line), read_file) != NULL) {
-        fprintf(write_file, "%s", line);
-    }
-    
-    fclose(read_file);
-    fclose(write_file);
-
-    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -1267,8 +1178,8 @@ int main(int argc, char *argv[]) {
     if (strcmp(command, "log") == 0){
         return run_log(argc, argv);
     }
-    if (strcmp(command, "checkout") == 0) {
-        return run_checkout(argc, argv);
+    if (strcmp (command, "branch") == 0){
+        return run_branch(argc, argv);
     }
     
     return 0;
