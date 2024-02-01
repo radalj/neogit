@@ -194,13 +194,18 @@ char* get_head(char * branch){
     char* head = find_source();
     strcat(head, "/heads");
     char * ans = (char *) malloc(100);
+    bool exist = 0;
     char chert[100];
     FILE * H = fopen(head, "r");
     while(fscanf(H, "%s %s", chert, ans) != EOF){
-        if (strcmp(chert, branch) == 0) break;
+        if (strcmp(chert, branch) == 0){
+            exist = 1;
+            break;
+        }
     }
     fclose(H);
-    return ans;   
+    if (exist) return ans;    
+    return NULL;
 }
 
 void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
@@ -773,7 +778,7 @@ char * get_cur_branch(){
     fclose(file);
     char tmp[100];
     char * branch = (char *)malloc(100);
-    sscanf("%s %s", tmp, branch);   
+    sscanf(line, "%s %s", tmp, branch);   
     return branch;
 }
 
@@ -805,6 +810,7 @@ void check_status(char * path){
     int ln = strlen(nw_path);
     line = find_in_file(comm, nw_path, ln);
     if (line == NULL){
+        printf("%s : ", path);
         if (is_staged(path)) printf("+A\n");
         else printf("-A\n");
         return;
@@ -821,6 +827,8 @@ int run_status(){
         fprintf(stderr, "neogit storage not found!\n");
         return 1;
     }
+    strcat(path, "/files");
+    check_status(path);
     char * branch = get_cur_branch();
     char * head = get_head(branch);
     char * comm = find_source();
@@ -849,8 +857,8 @@ int run_status(){
         fst = '\0';
         FILE * file2 = fopen(line, "r");
         if (file2 == NULL){
-            printf("%s : ", path);
-            if (is_staged_del(path)) printf("+D\n");
+            printf("%s : ", line);
+            if (is_staged_del(line)) printf("+D\n");
             else printf("-D\n");
         }
         else fclose(file2);
@@ -1238,6 +1246,159 @@ int run_branch(int argc, char * const argv[]){
     return 0;
 }
 
+void delete_all_files(char * path){
+    int isdir = is_dir(path);
+    if (isdir == 0){
+        remove(path);
+        return;
+    }
+    struct dirent *entry;
+    DIR * dir = opendir(path);
+    strcat(path, "/");
+    int ln = strlen(path);
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name,".") == 0 || strcmp(entry->d_name,"..") == 0) continue;
+        strcat(path, entry->d_name);
+        delete_all_files(path);
+        path[ln] = '\0';
+    } 
+    closedir(dir);
+}
+
+int goto_commit(char * commit_id){
+    char * src_files = find_source();
+    strcat(src_files, "/files");
+    delete_all_files(src_files);
+    free(src_files);
+    char * commit = find_source();
+    strcat(commit, "/commits/");
+    strcat(commit, commit_id);
+    FILE * com_file = fopen(commit, "r");
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, com_file);
+    while (fgets(line, MAX_LINE_LENGTH, com_file) != NULL){
+        int ln = strlen(line) - 1;
+        line[ln] = '\0';
+        char *des = (char *)malloc(MAX_LINE_LENGTH);
+        strcpy(des, line);
+        bool fst = 0;
+        for (int i = ln - 1; i >= 0; i--){
+            if (des[i] == '_'){
+                if (fst == 0){
+                    fst = 1;
+                    des[i] = '\0';
+                }
+                else des[i] = '/';
+            }
+            else if (des[i] == '/'){
+                des += (i + 1);
+                break;
+            }
+        }
+        copy_file(line, des);
+    }
+    fclose(com_file);
+    return 0;
+}
+
+bool check_change_recur(char * path){
+    int isdir = is_dir(path);
+    if (isdir == 1){
+        DIR *dir = opendir(path);
+        struct dirent *entry;
+        int ln = strlen(path);
+        while ((entry = readdir(dir)) != NULL) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+            strcat(path,"/");
+            strcat(path, entry->d_name);
+            if (check_change_recur(path)){
+                closedir(dir);
+                return 1;
+            }
+            path[ln] = '\0';
+        }
+        closedir(dir); 
+        return 0;
+    }
+    char * branch = get_cur_branch();
+    char * head = get_head(branch);
+    char * comm = find_source();
+    strcat(comm,"/commits/");
+    strcat(comm, head);
+    char * nw_path = find_source();
+    char * line;
+    strcat(nw_path, "/all/");
+    strcat(nw_path, pathto_(path));
+    int ln = strlen(nw_path);
+    line = find_in_file(comm, nw_path, ln);
+    if (line == NULL) return 1;
+    return is_dif(line, path);
+}
+
+bool check_change(){
+    char * path = find_source();
+    strcat(path, "/files");
+    if (check_change_recur(path)) return 1;
+    char * branch = get_cur_branch();
+    char * head = get_head(branch);
+    char * comm = find_source();
+    strcat(comm,"/commits/");
+    strcat(comm, head);
+    char * line = (char*)malloc(MAX_LINE_LENGTH);
+    FILE * file = fopen(comm, "r");
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        int ln = strlen(line);
+        bool fst = 0;
+        for (int i = ln-1; i >= 0; i--){
+            if (line[i] == '/'){
+                line += (i + 1);
+                ln -= (i + 1);
+                break;
+            }
+            if (line[i] == '_'){
+                if (fst == 0){
+                    fst = 1;
+                    line[i] = '\0';
+                }
+                else line[i] = '/';
+            }
+        }
+        fst = '\0';
+        FILE * file2 = fopen(line, "r");
+        if (file2 == NULL) return 1;
+        else fclose(file2);
+    }
+    fclose(file);
+    return 0;
+}
+
+int run_checkout(int argc, char* const argv[]){
+    if (argc < 3){
+        fprintf(stderr, "Please enter a valid commit id\n");
+        return 1;
+    }
+    if (check_change() && strcmp(argv[2], "HEAD") != 0){
+        fprintf(stderr, "You have uncommited changes!\n");
+        return 1;
+    }
+    if (find_source == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    char * commit_id;
+    if (strcmp(argv[2], "HEAD") == 0)
+        commit_id = get_head(get_cur_branch());
+    else{
+        commit_id = get_head(argv[2]);
+        if (commit_id == NULL){
+             commit_id = argv[2];
+        }
+    }
+    goto_commit(commit_id);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stdout, "please enter a valid command\n");
@@ -1289,6 +1450,9 @@ int main(int argc, char *argv[]) {
     }
     if (strcmp (command, "branch") == 0){
         return run_branch(argc, argv);
+    }
+    if (strcmp (command, "checkout") == 0){
+        return run_checkout(argc, argv);
     }
     
     return 0;
