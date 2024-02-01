@@ -983,6 +983,23 @@ int run_commit(int argc, char * const argv[]) {
     remove(head);
     rename(tmp, head);
 
+    //write config
+    char * conf = find_source();
+    strcat(conf, "/config");
+    file2 = fopen(tmp, "w");
+    file = fopen(conf, "r");
+    for (int i = 0; i < 5; i++){
+        fgets(line, MAX_LINE_LENGTH, file);
+        if (i != 3){
+            fprintf(file2, "%s", line);
+            continue;
+        }
+        fprintf(file2, "current_commit_ID: %d\n", commit_ID);
+    }
+    fclose(file);
+    fclose(file2);
+    remove(conf);
+    rename(tmp, conf);
     if (reset_staging()) return 1;
     free(tmp);
     free(last_commit);
@@ -1090,7 +1107,21 @@ char * get_messaage(char* commit_id){
     for (int i = 0; i < 2; i++) fgets(line, 1000, file);
     fclose(file);
     free(src);
+    line[strlen(line) - 1] = '\0';
     return line + 10;
+}
+
+char * get_par(char * commit_id){
+    char* line = (char*) malloc(1000);
+    char * src = find_source();
+    strcat(src, "/commits/");
+    strcat(src, commit_id);
+    FILE * file = fopen(src, "r");
+    for (int i = 0; i < 8; i++) fgets(line, 1000, file);
+    fclose(file);
+    free(src);
+    line[strlen(line) - 1] = '\0';
+    return line + 6;
 }
 
 int run_log(int argc, char * const argv[]){
@@ -1387,15 +1418,43 @@ int run_checkout(int argc, char* const argv[]){
         return 1;
     }
     char * commit_id;
-    if (strcmp(argv[2], "HEAD") == 0)
+    if (strncmp(argv[2], "HEAD", 4) == 0){
         commit_id = get_head(get_cur_branch());
+        int n;
+        if (strcmp(argv[2], "HEAD") == 0) n = 0;
+        else n = atoi(argv[2] + 5);
+        while (n--){
+            char * par = get_par(commit_id);
+            if (strcmp(par, "0") == 0) break;
+            commit_id = par;
+        }
+    }
     else{
         commit_id = get_head(argv[2]);
         if (commit_id == NULL){
              commit_id = argv[2];
         }
     }
+    printf("You checkouted to commit %s\n", commit_id);
     goto_commit(commit_id);
+    char* nw_br = get_branch(commit_id);
+    char * conf = find_source();
+    char * tmp = find_source();
+    strcat(conf, "/config");
+    strcat(tmp, "/tmp");
+    FILE* src = fopen(conf, "r");
+    FILE* des = fopen(tmp, "w");
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 3; i++){
+        fgets(line, MAX_LINE_LENGTH, src);
+        fprintf(des, "%s", line);
+    }
+    fprintf(des, "current_commit_ID: %s\n", commit_id);
+    fprintf(des, "branch: %s\n", nw_br);
+    fclose(des);
+    fclose(src);
+    remove(conf);
+    rename(tmp, conf);
     return 0;
 }
 
