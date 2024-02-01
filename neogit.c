@@ -238,7 +238,7 @@ void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
 int config(int argc, char * const argv[]){    
     bool isglobal = (strcmp(argv[2], "-global") != 0);
     if (argc < 6 - isglobal){
-        printf("Too few arguments\n");
+        fprintf(stderr, "Too few arguments\n");
         return 1;
     }
     if (strcmp(argv[2], "-global") == 0){
@@ -247,7 +247,7 @@ int config(int argc, char * const argv[]){
             if (strcmp(argv[4],"name") == 0) fl = 0;
             else if (strcmp(argv[4],"email") == 0) fl = 1;
             else{
-                printf("Invalid command\n");
+                fprintf(stderr, "Invalid command\n");
                 return 1;
             }
             FILE* list = fopen("/home/radal/.base/list","r");
@@ -284,7 +284,7 @@ int config(int argc, char * const argv[]){
             char* src = "/home/radal/.base/commands";
             bool fl = add_to_line(src, argv[4], argv[5]);
             if (fl == 0){
-                printf("there's no command as %s!\n", argv[5]);
+                fprintf(stderr, "there's no command as %s!\n", argv[5]);
                 return 1;
             }
             FILE* list = fopen("/home/radal/.base/list", "r");
@@ -298,7 +298,7 @@ int config(int argc, char * const argv[]){
             printf("alias %s was added successfully and globaly!\n", argv[4]);
             return 0;
         }
-        printf("What the Fuck do you mean!\n");
+        fprintf(stderr, "What the Fuck do you mean!\n");
         return 1;
     }
     if (strcmp(argv[2], "user") == 0){
@@ -306,7 +306,7 @@ int config(int argc, char * const argv[]){
         if (strcmp(argv[3],"name") == 0) fl = 0;
         else if (strcmp(argv[3],"email") == 0) fl = 1;
         else{
-            printf("Invalid command\n");
+            fprintf(stderr, "Invalid command\n");
             return 1;
         }
         char* des = find_source();
@@ -320,13 +320,13 @@ int config(int argc, char * const argv[]){
         strcat(src, "/commands");
         bool fl = add_to_line(src, argv[3], argv[4]);
         if (fl == 0){
-            printf("there's no command as %s\n", argv[4]);
+            fprintf(stderr, "there's no command as %s\n", argv[4]);
             return 1;
         }
-        printf("alias %s was added successfully!\n", argv[3]);
+        fprintf(stderr, "alias %s was added successfully!\n", argv[3]);
         return 0;
     }
-    printf("What the fuck do you mean!\n");
+    fprintf(stderr, "What the fuck do you mean!\n");
     return 1;
 }
 
@@ -340,7 +340,7 @@ int run_init(int argc, char * const argv[]) {
         // find .neogit
         DIR *dir = opendir(".");
         if (dir == NULL) {
-            perror("Error opening current directory");
+            fprintf(stderr, "Error opening current directory!\n");
             return 1;
         }
         while ((entry = readdir(dir)) != NULL) {
@@ -413,6 +413,9 @@ int create_configs(char *username, char *email) {
     // create files folder
     if (mkdir(".neogit/files", 0755) != 0) return 1;
 
+    //create tags folder
+    if (mkdir(".neogit/tags", 0755) != 0) return 1;
+
     for (int i = 0; i <= 10; i++){
         char src[50],del[50];
         strcpy(src, ".neogit/staging_");
@@ -468,7 +471,11 @@ void dfs_on_files(char * path, int h){
 int run_add(int argc, char *const argv[]) {
     bool isf = (strcmp(argv[2], "-f") == 0),isn = (strcmp(argv[2], "-n") == 0);
     if (argc < 3 + isf + isn){
-        printf("please specify a file\n");
+        fprintf(stderr, "please specify a file\n");
+        return 1;
+    }
+    if (find_source() == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
         return 1;
     }
 
@@ -569,7 +576,7 @@ int add_to_staging(char *filepath,int num) {
         struct dirent *entry;
         DIR *dir = opendir(filepath);
         if (dir == NULL){
-            printf("Error opening directory\n!");
+            fprintf(stderr, "Error opening directory\n!");
             return 1;
         }
         int len = strlen(filepath);
@@ -624,6 +631,10 @@ int add_to_staging(char *filepath,int num) {
 int run_reset(int argc, char *const argv[]) {
     if (argc < 3){
         fprintf(stderr, "Invalid format\n");
+        return 1;
+    }
+    if (find_source() == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
         return 1;
     }
     if (argc == 3 && strcmp(argv[2], "-undo") == 0){
@@ -909,6 +920,10 @@ int run_commit(int argc, char * const argv[]) {
         fprintf(stderr,"please use the correct format!\n");
         return 1;
     }
+    if (find_source() == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
 
     int ind = 3;
     char message[MAX_MESSAGE_LENGTH];
@@ -933,10 +948,6 @@ int run_commit(int argc, char * const argv[]) {
     if (commit_ID == -1) return 1;
 
     char * src = find_source();
-    if (src == NULL){
-        fprintf(stderr, "neogit storage not found!\n");
-        return 1;
-    }
     char * des = find_source();
     strcat(src, "/commits/");
     strcat(src, numtostr(commit_ID));
@@ -1162,6 +1173,10 @@ char * get_par(char * commit_id){
 }
 
 int run_log(int argc, char * const argv[]){
+    if (find_source() == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
     bool isbr = (strcmp("-branch", argv[2]) == 0);
     bool isauth = (strcmp("-author", argv[2]) == 0);
     if (isbr && is_val_branch(argv[3]) == 0){
@@ -1175,10 +1190,6 @@ int run_log(int argc, char * const argv[]){
     char* coms[1000];
     int num = 0;
     char *address = find_source();
-    if (address == NULL){
-        fprintf(stderr, "neogit storage not found!\n");
-        return 1;
-    }
     strcat(address, "/commits");
     DIR * dir = opendir(address);
     struct dirent *entry;
@@ -1472,12 +1483,12 @@ int run_checkout(int argc, char* const argv[]){
         fprintf(stderr, "Please enter a valid commit id\n");
         return 1;
     }
-    if (check_change() && strcmp(argv[2], "HEAD") != 0){
-        fprintf(stderr, "You have uncommited changes!\n");
-        return 1;
-    }
     if (find_source == NULL){
         fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    if (check_change() && strcmp(argv[2], "HEAD") != 0){
+        fprintf(stderr, "You have uncommited changes!\n");
         return 1;
     }
     char * commit_id;
@@ -1519,6 +1530,111 @@ int run_checkout(int argc, char* const argv[]){
     remove(conf);
     rename(tmp, conf);
     return 0;
+}
+
+int run_tag(int argc, char* const argv[]){
+    char * src = find_source();
+    if (src == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    if (argc == 2){
+        strcat(src,"/tags");
+        char* tags[1000];
+        int num_tag = 0;
+        struct dirent *entry;
+        DIR *dir = opendir(src);
+        if (dir == NULL) {
+            fprintf(stderr, "Error opening current directory!\n");
+            return 1;
+        }
+        while ((entry = readdir(dir)) != NULL) {
+            if (entry->d_type == DT_DIR) continue;
+            tags[num_tag] = (char *)malloc(strlen(entry->d_name) + 10);
+            strcpy(tags[num_tag], entry->d_name);
+            num_tag++;
+        }
+        closedir(dir);        
+        for (int i = 1; i < num_tag; i++){
+            int j = i; 
+            while (j > 0 && strcmp(tags[j],tags[j-1]) < 0){
+                char * tmp = tags[j];
+                tags[j - 1] = tags[j];
+                tags[j] = tmp;
+                j--;
+            }
+        }
+        for (int i = 0; i < num_tag; i++){
+            printf("%s\n", tags[i]);
+        }
+        return 0;
+    }
+    if (argc == 4 && strcmp(argv[2], "show") == 0){
+        strcat(src, "/tags/");
+        strcat(src, argv[3]);
+        FILE * file = fopen(src, "r");
+        if (file == NULL){
+            fprintf(stderr, "Invalid tag name\n");
+            return 1;
+        }
+        char line[MAX_LINE_LENGTH];
+        while (fgets(line, MAX_LINE_LENGTH, file) != NULL)
+            printf("%s",line);
+        fclose(file);
+        return 0;
+    }
+    if (argc >= 4 && strcmp(argv[2], "-a") == 0){
+        char * message = "";
+        bool isf = (strcmp(argv[argc - 1], "-f") == 0);
+        if (argc >= 6 && strcmp(argv[4], "-m") == 0){
+            message = argv[5];
+        }
+        char * commit_id = NULL;
+        for (int i = 4; i + 1 < argc; i++){
+            if (strcmp(argv[i], "-c") == 0){
+                commit_id = argv[i + 1];
+                break;
+            }
+        }
+        strcat(src, "/config");
+        FILE* file = fopen(src, "r");
+        if (commit_id == NULL){
+            commit_id = (char *)malloc(100);
+            for (int i = 0; i < 8; i++){
+                fscanf(file, "%s", commit_id);
+            }
+            rewind(file);
+        }
+        char user[1000],email[1000];
+        fscanf(file, "username: %s", user);
+        fscanf(file, "%s %s", email, email);
+        fclose(file);
+
+        src = find_source();
+        strcat(src, "/tags/");
+        strcat(src, argv[3]);
+        file = fopen(src, "r");
+        if (file != NULL){
+            fclose(file);
+            if (isf == 0){
+                fprintf(stderr, "tag already exists!\n");
+                return 1;
+            }
+        }
+        file = fopen(src, "w");
+        time_t t = time(NULL);
+        struct  tm tm = *localtime(&t);
+        fprintf(file, "time : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+        fprintf(file, "username: %s\n", user);
+        fprintf(file, "email: %s\n", email);
+        fprintf(file, "message: %s\n", message);
+        fprintf(file, "commit_id: %s\n", commit_id);
+        fclose(file);
+        printf("tag built successfully\n");
+        return 0;
+    }
+    fprintf(stderr, "Invalid command\n");
+    return 1;
 }
 
 int main(int argc, char *argv[]) {
@@ -1576,6 +1692,10 @@ int main(int argc, char *argv[]) {
     if (strcmp (command, "checkout") == 0){
         return run_checkout(argc, argv);
     }
-    
+    // phase 2
+    if (strcmp (command, "tag") == 0){
+        return run_tag(argc, argv);
+    }
+
     return 0;
 }
