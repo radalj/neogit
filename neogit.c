@@ -255,6 +255,28 @@ int config(int argc, char * const argv[]){
             while (fscanf(list,"%s",dir) != EOF){
                 write_config(dir, argv[5], fl);
             }
+            fclose(list);
+            FILE * conf = fopen("/home/radal/.base/config", "r");
+            int num = 0;            
+            char user[1000], email[1000];
+            user[0] = '\0';
+            email[0] = '\0';
+            char line[MAX_LINE_LENGTH];
+            while (fgets(line , MAX_LINE_LENGTH, conf) != NULL){
+                num++;
+                if (strncmp(line, "username",8) == 0) sscanf(line, "username: %s", user);
+                else sscanf(line, "email: %s", email);
+            }
+            conf = fopen("/home/radal/.base/config", "w");
+            if (fl == 0){
+                fprintf(conf, "username: %s\n", argv[5]);
+                if (email[0] != '\0') fprintf(conf, "email: %s\n", email);
+            }
+            else{
+                if (user[0] != '\0') fprintf(conf, "username: %s\n", user);
+                fprintf(conf, "email: %s\n", argv[5]);
+            }
+            fclose(conf);
             printf("Global success!\n");
             return 0;
         }
@@ -341,6 +363,22 @@ int run_init(int argc, char * const argv[]) {
     if (chdir(cwd) != 0) return 1;
         
     if (!exists) {
+        FILE * file = fopen("/home/radal/.base/config", "r");
+        int num = 0;
+        char line[MAX_LINE_LENGTH];
+        char user[1000], email[1000];
+        while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+            num++;
+            if (num == 1)
+                sscanf(line, "username: %s", user);
+            else
+                sscanf(line, "email: %s", email);
+        }
+        fclose(file);
+        if (num < 2){
+            fprintf(stderr, "Please configure your email and username!\n");
+            return 1;
+        }
         if (mkdir(".neogit", 0755) != 0) return 1;
         printf("successfully initialized the project!\n");
         if (find_in_file("/home/radal/.base/list", cwd, strlen(cwd)) == NULL){
@@ -348,7 +386,7 @@ int run_init(int argc, char * const argv[]) {
             fprintf(list,"%s\n",cwd);
             fclose(list);
         }
-        return create_configs("radin", "radinjarireh@gmail.com");
+        return create_configs(user, email);
     }
     printf("neogit repository has already initialized\n");
     return 0;
