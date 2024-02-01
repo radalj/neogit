@@ -815,6 +815,26 @@ bool is_staged_del(char * path){
     return 0;
 }
 
+char * get_cur_commit(){
+    char * conf = find_source();
+    strcat(conf,"/config");
+    FILE * file = fopen(conf, "r");
+    char * cur_com = (char*) malloc(1000);
+    for (int i = 0; i < 8; i++) fscanf(file, "%s", cur_com);
+    fclose(file);
+    return cur_com;
+}
+
+char * get_lst_commit(){
+    char * conf = find_source();
+    strcat(conf,"/config");
+    FILE * file = fopen(conf, "r");
+    char * lst_com = (char*) malloc(1000);
+    for (int i = 0; i < 6; i++) fscanf(file, "%s", lst_com);
+    fclose(file);
+    return lst_com;
+}
+
 char * get_cur_branch(){
     char * conf = find_source();
     if (conf == NULL)
@@ -1532,6 +1552,74 @@ int run_checkout(int argc, char* const argv[]){
     return 0;
 }
 
+int run_revert(int argc, char * const argv[]){
+    char * src = find_source();
+    if (src == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    if (argc >= 3 && strcmp(argv[2], "-n") == 0){
+        char * commit_id;
+        if (argc == 4) commit_id = argv[3];
+        else commit_id = get_lst_commit();
+        goto_commit(commit_id);
+        printf("Project is now at %s\n", commit_id);
+        return 0;
+    }
+    int is_m = (strcmp(argv[2], "-m") == 0);
+    if (argc < 3 + 2*is_m){
+        fprintf(stderr, "Invalid format\n");
+        return 1;
+    }
+    char * message = NULL;
+    if (is_m) message = argv[3];
+    char * commit_id;
+    if (strncmp(argv[argc - 1], "HEAD-", 5) == 0){
+        int n = atoi(argv[argc - 1] + 5);
+        commit_id = get_cur_commit();
+        while (n--){
+            char * par = get_par(commit_id);
+            if (strcmp(par,"0") == 0) break;
+            commit_id = par;
+        }
+    }
+    else commit_id = argv[argc - 1];
+    if (!is_m) message = get_messaage(commit_id);
+    goto_commit(commit_id);
+    int nw_id = inc_last_commit_ID();
+    strcat(src, "/commits/");
+    char * des = (char *)malloc(MAX_LINE_LENGTH);
+    strcpy(des, src);
+    strcat(des, numtostr(nw_id));
+    strcat(src, commit_id);
+    char * conf = find_source();
+    strcat(conf, "/config");
+    FILE* file = fopen(conf, "r");
+    char user[100],email[1000];
+    fscanf(file, "%s %s", user, user);
+    fscanf(file, "%s %s", email, email);
+    fclose(file);
+    file = fopen(src, "r");
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 5; i++) fgets(line, MAX_LINE_LENGTH, file);
+    debug(des);
+    FILE* file2 = fopen(des, "w");
+    time_t t = time(NULL);
+    struct  tm tm = *localtime(&t);
+    fprintf(file2, "time : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    fprintf(file2, "username: %s\n", user);
+    fprintf(file2, "email: %s\n", email);
+    fprintf(file2, "message: %s\n", message);
+    fprintf(file2, "commit_id: %d\n", nw_id);    
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        fprintf(file2, "%s", line);
+    }
+    fclose(file2);
+    fclose(file);
+    printf("Project is now at %d\n", nw_id);
+    return 0;
+}
+
 int run_tag(int argc, char* const argv[]){
     char * src = find_source();
     if (src == NULL){
@@ -1597,14 +1685,9 @@ int run_tag(int argc, char* const argv[]){
             }
         }
         strcat(src, "/config");
+        if (commit_id == NULL)
+            commit_id = get_cur_commit();
         FILE* file = fopen(src, "r");
-        if (commit_id == NULL){
-            commit_id = (char *)malloc(100);
-            for (int i = 0; i < 8; i++){
-                fscanf(file, "%s", commit_id);
-            }
-            rewind(file);
-        }
         char user[1000],email[1000];
         fscanf(file, "username: %s", user);
         fscanf(file, "%s %s", email, email);
@@ -1693,6 +1776,9 @@ int main(int argc, char *argv[]) {
         return run_checkout(argc, argv);
     }
     // phase 2
+    if (strcmp (command, "revert") == 0){
+        return run_revert(argc, argv);
+    }
     if (strcmp (command, "tag") == 0){
         return run_tag(argc, argv);
     }
