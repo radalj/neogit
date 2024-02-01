@@ -295,7 +295,6 @@ int config(int argc, char * const argv[]){
     }
     if (strcmp(argv[2], "alias") == 0){
         char* src = find_source();
-        src = realloc(src, strlen(src) + 20);
         strcat(src, "/commands");
         bool fl = add_to_line(src, argv[3], argv[4]);
         if (fl == 0){
@@ -1145,7 +1144,32 @@ int run_log(int argc, char * const argv[]){
     strcat(address, "/commits");
     DIR * dir = opendir(address);
     struct dirent *entry;
-    if (argc == 2 || (argc == 4 && (strcmp("-n", argv[2]) == 0 || isbr || isauth))){
+    if (argc == 4 && (strcmp(argv[2], "-since") == 0 || strcmp(argv[2], "-before") == 0)){
+        int dd,mm,yy;
+        sscanf(argv[3], "%d/%d/%d", &dd, &mm, &yy);
+        strcat(address,"/");
+        int ln = strlen(address);
+        while ((entry = readdir(dir)) != NULL){
+            if (entry->d_type != DT_REG || strcmp(entry->d_name,"0") == 0) continue;
+            int dd2,mm2,yy2;
+            strcat(address, entry->d_name);
+            FILE* file = fopen(address, "r");
+            fscanf(file, "TIME : %d/%d/%d", &dd2, &mm2, &yy2);
+            fclose(file);
+            address[ln] = '\0';
+            if (strcmp(argv[2], "-since") == 0){
+                if (yy2 < yy || (yy2 == yy && mm2 < mm) || (yy2 == yy && mm2 == mm && dd2 < dd)) continue;
+            }
+            else{
+                if (yy2 > yy || (yy2 ==yy && mm2 > mm) || (yy2 == yy && mm2 == mm && dd2 > dd)) continue;
+            }
+            coms[num] = (char *)malloc(20);
+            strcpy(coms[num],entry->d_name);
+            num++;
+        }  
+    }
+
+    else if (argc == 2 || (argc == 4 && (strcmp("-n", argv[2]) == 0 || isbr || isauth))){
         while ((entry = readdir(dir)) != NULL){
             if (entry->d_type != DT_REG || strcmp(entry->d_name,"0") == 0) continue;
             if (isbr && strcmp(argv[3], get_branch(entry->d_name)) != 0) continue;
@@ -1155,6 +1179,7 @@ int run_log(int argc, char * const argv[]){
             num++;
         }
     }
+
     else if(argc >= 4 && strcmp("-search", argv[2]) == 0){
         while ((entry = readdir(dir)) != NULL){
             if (entry->d_type != DT_REG || strcmp(entry->d_name,"0") == 0) continue;
