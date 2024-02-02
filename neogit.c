@@ -9,6 +9,7 @@
 
 #define MAX_LINE_LENGTH 2024
 #define MAX_MESSAGE_LENGTH 1000
+#define MAX_LINE_NUMBER 2000
 
 #define debug(x) printf("%s\n", x);
 
@@ -72,6 +73,27 @@ char * pathto_(char * filepath){
         else ans[i] = filepath[i];
     }
     ans[ln] = '\0';
+    return ans;
+}
+
+char * get_source_path(char *path){
+    char * ans = (char *)malloc(strlen(path));
+    strcpy(ans, path);
+    int ln = strlen(path);
+    bool fst = 0;
+    for (int i = ln - 1; i >= 0; i--){
+        if (ans[i] == '/'){
+            ans += i + 1;
+            break;
+        }
+        if (ans[i] == '_'){
+            if (fst)
+                ans[i] = '/';
+            else
+                ans[i] = '\0';
+            fst = 1;
+        }
+    }
     return ans;
 }
 
@@ -148,7 +170,8 @@ int add_to_line(char * src,char* word, char* key){
     FILE* com2 = fopen(des, "r");
     while (fgets(line, 1000, com2) != NULL){
         i++;
-        line[strlen(line) - 1] = '\0';
+        int ln = strlen(line);
+        if (line[ln - 1] == '\n') line[ln - 1] = '\0';
         if (i == line_num){
             fprintf(com, "%s %s\n", line, word);
         }
@@ -166,7 +189,8 @@ char * find_in_file(char * src, char* key,int num){
     char * line = (char *)malloc(1000);
     FILE * file = fopen(src, "r");
     while (fgets(line, 1000, file) != NULL){
-        line[strlen(line) - 1] = '\0';
+        int ln = strlen(line);
+        if (line[ln - 1] == '\n') line[ln - 1] = '\0';
         if (strncmp(line, key, num) == 0) return line;
     }
     return NULL;
@@ -177,7 +201,7 @@ char* abs_path(char* path){
     if (getcwd(cwd,1000) == NULL) return NULL;
     strcat(cwd, "/");
     strcat(cwd, path);
-    char * ret = (char *)calloc(1000,1);
+    char * ret = (char *)calloc(MAX_LINE_LENGTH,1);
     strcpy(ret, cwd);
     return ret;
 }
@@ -610,7 +634,8 @@ int add_to_staging(char *filepath,int num) {
         FILE * file = fopen(src, "r");
         FILE * file2 = fopen(tmp, "w");
         while (fgets(line, 1000, file) != NULL){
-            line[strlen(line) - 1] = '\0';
+            int ln = strlen(line);
+            if (line[ln - 1] == '\n') line[ln - 1] = '\0';
             if (strncmp(line,des,ln) == 0) continue;
             fprintf(file2, "%s\n", line);
         }
@@ -778,7 +803,8 @@ bool is_changed(char* path, char* last_commit){
     char line[MAX_LINE_LENGTH];
     bool exist = 0;
     while (fgets(line, MAX_LINE_LENGTH, commit) != NULL){
-        line[strlen(line) - 1] = '\0';
+        int ln = strlen(line);
+        if (line[ln - 1] == '\n') line[ln - 1] = '\0';
         if (strncmp(line, src, strlen(src)) == 0){
             exist = 1;
             break;
@@ -906,23 +932,7 @@ int run_status(){
     FILE * file = fopen(comm, "r");
     for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
     while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-        int ln = strlen(line);
-        bool fst = 0;
-        for (int i = ln-1; i >= 0; i--){
-            if (line[i] == '/'){
-                line += (i + 1);
-                ln -= (i + 1);
-                break;
-            }
-            if (line[i] == '_'){
-                if (fst == 0){
-                    fst = 1;
-                    line[i] = '\0';
-                }
-                else line[i] = '/';
-            }
-        }
-        fst = '\0';
+        line = get_source_path(line);
         FILE * file2 = fopen(line, "r");
         if (file2 == NULL){
             printf("%s : ", line);
@@ -1175,7 +1185,8 @@ char * get_messaage(char* commit_id){
     for (int i = 0; i < 2; i++) fgets(line, 1000, file);
     fclose(file);
     free(src);
-    line[strlen(line) - 1] = '\0';
+    int ln = strlen(line);
+    if (line[ln - 1] == '\n') line[ln - 1] = '\0';
     return line + 10;
 }
 
@@ -1187,8 +1198,9 @@ char * get_par(char * commit_id){
     FILE * file = fopen(src, "r");
     for (int i = 0; i < 8; i++) fgets(line, 1000, file);
     fclose(file);
-    free(src);
-    line[strlen(line) - 1] = '\0';
+    free(src);        
+    int ln = strlen(line);
+    if (line[ln - 1] == '\n') line[ln - 1] = '\0';
     return line + 6;
 }
 
@@ -1403,7 +1415,7 @@ int goto_commit(char * commit_id){
     for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, com_file);
     while (fgets(line, MAX_LINE_LENGTH, com_file) != NULL){
         int ln = strlen(line) - 1;
-        line[ln] = '\0';
+        if (line[ln] == '\n') line[ln] = '\0';
         char *des = (char *)malloc(MAX_LINE_LENGTH);
         strcpy(des, line);
         bool fst = 0;
@@ -1473,23 +1485,7 @@ bool check_change(){
     FILE * file = fopen(comm, "r");
     for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
     while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-        int ln = strlen(line);
-        bool fst = 0;
-        for (int i = ln-1; i >= 0; i--){
-            if (line[i] == '/'){
-                line += (i + 1);
-                ln -= (i + 1);
-                break;
-            }
-            if (line[i] == '_'){
-                if (fst == 0){
-                    fst = 1;
-                    line[i] = '\0';
-                }
-                else line[i] = '/';
-            }
-        }
-        fst = '\0';
+        line = get_source_path(line);
         FILE * file2 = fopen(line, "r");
         if (file2 == NULL) return 1;
         else fclose(file2);
@@ -1742,6 +1738,231 @@ int run_tag(int argc, char* const argv[]){
     return 1;
 }
 
+bool iswhitespace(char c){
+    if (c == ' ' || c == '\n' || c == '\t') return 1;
+    return 0;
+}
+
+int* filetoint(char * path){
+    FILE * file = fopen(path, "r");
+    int * ans = (int *) malloc(MAX_LINE_NUMBER * sizeof(int));
+    int num = 0,line_num = 0;
+    char line[MAX_LINE_LENGTH],word[MAX_LINE_LENGTH];
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        int i = 0;
+        while (iswhitespace(line[i])) i++;
+        line_num++;
+        if (line[i] == '\0') continue;
+        ans[num] = line_num;
+        num++;
+    }
+    fclose(file);
+    return ans;   
+}
+
+char ** filetochar(char * path){
+    FILE * file = fopen(path, "r");
+    char ** ans = (char **) malloc(MAX_LINE_NUMBER * sizeof(char *));
+    int num = 0;
+    char line[MAX_LINE_LENGTH],word[MAX_LINE_LENGTH];
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        int sum_size = 0;
+        while (iswhitespace(line[sum_size])) sum_size++;
+        if (line[sum_size] == '\0') continue;
+        ans[num] = (char *) malloc(MAX_LINE_LENGTH);
+        ans[num][0] = '\0';
+        while (sscanf(line + sum_size, "%s", word) != EOF){
+            sum_size += strlen(word);
+            while (iswhitespace(line[sum_size])) sum_size++;
+            strcat(ans[num], word);
+        }
+        num++;
+    }
+    for (int i = num; i < MAX_LINE_NUMBER; i++) ans[i] = NULL;
+    fclose(file);
+    return ans;
+}
+
+char * num2line(char * path, int line_num){
+    char * line = malloc(MAX_LINE_LENGTH);
+    FILE * file = fopen(path, "r");
+    while (line_num--){
+        fgets(line, MAX_LINE_LENGTH, file);
+    }
+    fclose(file);
+    return line;
+}
+
+void get_diff(int argc, char * const argv[]){
+    bool iscommit = (strcmp(argv[0], "neogit") != 0);
+    char * path1 = argv[3];
+    char * path2 = argv[4];
+    char** first = filetochar(path1);
+    char** second = filetochar(path2);
+    int * line_id1 = filetoint(path1);
+    int * line_id2 = filetoint(path2);
+    int beg[2] = {0,0},en[2] = {MAX_LINE_NUMBER - 1, MAX_LINE_NUMBER - 1};
+    while (en[0] >= 0 && first[en[0]] == NULL) en[0]--;
+    while (en[1] >= 0 && second[en[1]] == NULL) en[1]--;
+    if (argc >= 7){
+        int x,y;
+        if (strcmp(argv[5], "-line1") == 0){
+            sscanf(argv[6], "%d-%d", &x, &y);
+            beg[0] = en[0] + 1;
+            for (int i = 0; i <= en[0]; i++){
+                if (line_id1[i] >= x){
+                    beg[0] = i;
+                    break;
+                }
+            }
+            int tmp = en[0];
+            en[0] = -1;
+            for (int i = tmp; i >= 0; i--){
+                if (line_id1[i] <= y){
+                    en[0] = i;
+                    break;
+                }
+            }
+        }
+        else if (strcmp(argv[5], "-line2") == 0){
+            sscanf(argv[6], "%d-%d", &x, &y);
+            beg[1] = en[1] + 1;
+            for (int i = 0; i <= en[1]; i++){
+                if (line_id2[i] >= x){
+                    beg[1] = i;
+                    break;
+                }
+            }
+            int tmp = en[1];
+            en[1] = -1;
+            for (int i = tmp; i >= 0; i--){
+                if (line_id2[i] <= y){
+                    en[1] = i;
+                    break;
+                }
+            }
+        }
+        if (argc == 9){
+            sscanf(argv[8], "%d-%d", &x, &y);
+            beg[1] = en[1] + 1;
+            for (int i = 0; i <= en[1]; i++){
+                if (line_id2[i] >= x){
+                    beg[1] = i;
+                    break;
+                }
+            }
+            int tmp = en[1];
+            en[1] = -1;
+            for (int i = tmp; i >= 0; i--){
+                if (line_id2[i] <= y){
+                    en[1] = i;
+                    break;
+                }
+            }
+        }
+    }
+    while (beg[0] <= en[0] && beg[1] <= en[1]){
+        if (strcmp(first[beg[0]], second[beg[1]]) == 0){
+            beg[0]++;
+            beg[1]++;
+            continue;
+        }
+        printf("\033[1;31m<<<<<<<<<\n\033[0m");
+        if (iscommit == 0)
+            printf("\033[1;31m%s line %d\n\033[0m", argv[3], line_id1[beg[0]]);
+        else
+            printf("\33[1;31m %s in %s line %d\n\033[0m", get_source_path(argv[3]), argv[0], line_id1[beg[0]]);
+        printf("\033[1;31m%s\033[0m", num2line(argv[3], line_id1[beg[0]]));
+        printf("\033[1;32m>>>>>>>>>\n\033[0m");
+        if (iscommit == 0)
+            printf("\033[1;32m%s line %d\n\033[0m", argv[4], line_id2[beg[1]]);
+        else
+            printf("\33[1;32m %s in %s line %d\n\033[0m", get_source_path(argv[4]), argv[1], line_id2[beg[1]]);
+        printf("\033[1;32m%s\033[0m", num2line(argv[4], line_id2[beg[1]]));
+        beg[0]++;
+        beg[1]++;
+    }
+    while (beg[0] <= en[0]){
+        printf("\033[1;31m<<<<<<<<<\n\033[0m");
+        if (iscommit == 0)
+            printf("\033[1;31m%s line %d\n\033[0m", argv[3], line_id1[beg[0]]);
+        else
+            printf("\33[1;31m %s in %s line %d\n\033[0m", get_source_path(argv[3]), argv[0], line_id1[beg[0]]);
+        printf("\033[1;31m%s\033[0m", num2line(argv[3], line_id1[beg[0]]));        
+        beg[0]++;
+    }
+    while (beg[1] <= en[1]){
+        printf("\033[1;32m>>>>>>>>>\n\033[0m");
+        if (iscommit == 0)
+            printf("\033[1;32m%s line %d\n\033[0m", argv[4], line_id2[beg[1]]);
+        else
+            printf("\33[1;32m %s in %s line %d\n\033[0m", get_source_path(argv[4]), argv[1], line_id2[beg[1]]);
+        printf("\033[1;32m%s\033[0m", num2line(argv[4], line_id2[beg[1]]));        
+        beg[1]++;
+    }
+}
+
+int run_diff(int argc, char * argv[]){
+    if (argc < 5 || argc%2 == 0){
+        fprintf(stderr, "Invalid format!\n");
+        return 1;
+    }
+    if (strcmp(argv[2], "-f") == 0){
+        argv[3] = abs_path(argv[3]);
+        argv[4] = abs_path(argv[4]);
+        get_diff(argc, argv);
+        return 0;
+    }
+    if (strcmp(argv[2], "-c") == 0){
+        char* path1 = find_source();
+        if (path1 == NULL){
+            fprintf(stderr, "neogit storage not found!\n");
+            return 1;
+        }
+        char* path2 = find_source();
+        strcat(path1, "/commits/");
+        strcat(path1, argv[3]);
+        strcat(path2, "/commits/");
+        strcat(path2, argv[4]);
+        FILE * file = fopen(path1, "r");
+        if (file == NULL){
+            fprintf(stderr, "Invalid commit id\n");
+            return 0;
+        }
+        char line[MAX_LINE_LENGTH];
+        for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+        while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+            int ln = strlen(line);
+            if (line[ln - 1] == '\n')
+                line[ln - 1] = '\0';
+            while (line[ln] != '_') ln--;
+            char * other = find_in_file(path2, line, ln);
+            if (other == "NULL"){
+                printf("\033[1;31mOnly commit %s has %s\n\033[0m", argv[3], get_source_path(line));
+                continue;
+            }
+            char* arg[5] = {argv[3], argv[4], "chert", line, other};
+            get_diff(5, arg);
+        }
+        fclose(file);
+        file = fopen(path2, "r");
+        for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+        while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+            int ln = strlen(line);
+            if (line[ln - 1] == '\n')
+                line[ln - 1] = '\0';
+            while (line[ln] != '_') ln--;
+            char * other = find_in_file(path1, line, ln);
+            if (other == "NULL"){
+                printf("\033[1;32mOnly commit %s has %s\n\033[0m", argv[4], get_source_path(line));
+                continue;
+            }
+        }
+        fclose(file);
+        return 0;
+    }
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stdout, "please enter a valid command\n");
@@ -1804,6 +2025,8 @@ int main(int argc, char *argv[]) {
     if (strcmp (command, "tag") == 0){
         return run_tag(argc, argv);
     }
-
+    if (strcmp (command, "diff") == 0){
+        return run_diff(argc, argv);
+    }
     return 0;
 }
