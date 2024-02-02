@@ -1552,6 +1552,21 @@ int run_checkout(int argc, char* const argv[]){
     return 0;
 }
 
+bool check_merge_happend(int commit_id){
+    char * merg = find_source();
+    strcat(merg, "/last_merge");
+    FILE * merge = fopen(merg, "r");
+    if (merge != NULL){
+        int last_merge;
+        fscanf(merge, "%d", &last_merge);
+        fclose(merge);
+        if (last_merge > commit_id){
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int run_revert(int argc, char * const argv[]){
     char * src = find_source();
     if (src == NULL){
@@ -1562,6 +1577,10 @@ int run_revert(int argc, char * const argv[]){
         char * commit_id;
         if (argc == 4) commit_id = argv[3];
         else commit_id = get_lst_commit();
+        if (check_merge_happend(atoi(commit_id))){
+            fprintf(stderr, "some merge happened after this commit\n");
+            return 1;
+        }
         goto_commit(commit_id);
         printf("Project is now at %s\n", commit_id);
         return 0;
@@ -1584,6 +1603,10 @@ int run_revert(int argc, char * const argv[]){
         }
     }
     else commit_id = argv[argc - 1];
+    if (check_merge_happend(atoi(commit_id))){
+        fprintf(stderr, "some merge happened after this commit\n");
+        return 1;        
+    }
     if (!is_m) message = get_messaage(commit_id);
     goto_commit(commit_id);
     int nw_id = inc_last_commit_ID();
@@ -1602,7 +1625,6 @@ int run_revert(int argc, char * const argv[]){
     file = fopen(src, "r");
     char line[MAX_LINE_LENGTH];
     for (int i = 0; i < 5; i++) fgets(line, MAX_LINE_LENGTH, file);
-    debug(des);
     FILE* file2 = fopen(des, "w");
     time_t t = time(NULL);
     struct  tm tm = *localtime(&t);
