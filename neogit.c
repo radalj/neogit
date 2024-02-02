@@ -2079,6 +2079,56 @@ int run_merge(int argc, char * argv[]){
     return 0;
 }
 
+void grep_in_file(char * path, char* word, bool has_n){
+    FILE * file = fopen(path, "r");
+    char line[MAX_LINE_LENGTH];
+    int line_num = 0;
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        line_num++;
+        if (strstr(line, word) != NULL){
+            if (has_n) printf("%d- ", line_num);
+            printf("%s", line);
+        }
+    }
+    fclose(file);
+}
+
+int run_grep(int argc, char * const argv[]){
+    if (argc < 6){
+        fprintf(stderr, "Invalid format!\n");
+        return 1;
+    }
+    bool has_n = (strcmp(argv[argc - 1], "-n") == 0);
+    if (argc < 8){
+        grep_in_file(abs_path(argv[3]), argv[5], has_n);
+        return 0;
+    }
+    char * path = find_source();
+    if (path == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    strcat(path, "/commits/");
+    strcat(path, argv[7]);
+    FILE * file = fopen(path, "r");
+    char line[MAX_LINE_LENGTH];
+    char * address = find_source();
+    strcat(address, "/all/");
+    strcat(address,pathto_(abs_path(argv[3])));
+    int length = strlen(address);
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        int ln = strlen(line) - 1;
+        if (line[ln] == '\n') line[ln] = '\0';
+        if (strncmp(line, address, length) == 0){
+            grep_in_file(line, argv[5], has_n);
+            break;
+        }
+    }
+    fclose(file);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stdout, "please enter a valid command\n");
@@ -2146,6 +2196,9 @@ int main(int argc, char *argv[]) {
     }
     if (strcmp (command, "merge") == 0){
         return run_merge(argc, argv);
+    }
+    if (strcmp (command, "grep") == 0){
+        return run_grep(argc, argv);
     }
     return 0;
 }
