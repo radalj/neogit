@@ -25,6 +25,26 @@ int track_file(char *filepath);
 bool is_tracked(char *filepath);
 bool is_staged(char * path);
 
+void add_tcommit(int t_commit, char * path){
+    char * path2 = (char *)malloc(MAX_LINE_LENGTH);
+    strcpy(path2, path);
+    strcat(path2, "tmp");
+    FILE * file = fopen(path, "r");
+    FILE * file2 = fopen(path2, "w");
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 6; i++){
+        fgets(line, MAX_LINE_LENGTH, file);
+        fprintf(file2, "%s", line);
+    }
+    fprintf(file2, "number of commited files : %d\n", t_commit);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        fprintf(file2, "%s", line);
+    }
+    fclose(file2);
+    fclose(file);
+    remove(path);
+    rename(path2, path);
+}
 
 char* numtostr(int num){
     char *ans = (char *)malloc(10);
@@ -1017,6 +1037,7 @@ int run_commit(int argc, char * const argv[]) {
         fprintf(stderr, "there's no staged file\n");
         return 1;
     }
+    t_commit = 0;
     //write commit info
     FILE * file = fopen(src, "w");
     fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -1025,7 +1046,6 @@ int run_commit(int argc, char * const argv[]) {
     fprintf(file, "email : %s\n", email);
     fprintf(file, "commit_id : %d\n", commit_ID);
     fprintf(file, "branch : %s\n", branch);
-    fprintf(file, "number of commited files : %d\n", t_commit);    
     fprintf(file, "par : %s\n", par);
     //write commit
     char * last_commit = find_source();
@@ -1036,15 +1056,18 @@ int run_commit(int argc, char * const argv[]) {
     while (fgets(line, MAX_LINE_LENGTH, lst) != NULL){
         if (find_in_file(src_deleted, line, strlen(line) - 6) != NULL) continue;
         if (find_in_file(src_stage, line, strlen(line) - 6) != NULL) continue;
+        t_commit++;
         fprintf(file, "%s", line);
     }
     fclose(lst);
     file2 = fopen(src_stage, "r");
     while (fgets(line, MAX_LINE_LENGTH, file2) != NULL){
+        t_commit++;
         fprintf(file, "%s", line);
     }
     fclose(file);
     fclose(file2);
+    add_tcommit(t_commit, src);
     //change head
     char* tmp = find_source();
     strcat(tmp, "/tmp");
@@ -1380,6 +1403,7 @@ int run_branch(int argc, char * const argv[]){
     file = fopen(head_path, "a");
     fprintf(file, "%s %d\n", argv[2], commit_ID);
     fclose(file);
+    printf("branch made\n");
     return 0;
 }
 
@@ -1793,8 +1817,9 @@ char * num2line(char * path, int line_num){
     return line;
 }
 
-void get_diff(int argc, char * const argv[]){
+bool get_diff(int argc, char * const argv[]){
     bool iscommit = (strcmp(argv[0], "neogit") != 0);
+    bool isdif = 0;
     char * path1 = argv[3];
     char * path2 = argv[4];
     char** first = filetochar(path1);
@@ -1867,39 +1892,91 @@ void get_diff(int argc, char * const argv[]){
             beg[1]++;
             continue;
         }
+        isdif = 1;
         printf("\033[1;31m<<<<<<<<<\n\033[0m");
         if (iscommit == 0)
             printf("\033[1;31m%s line %d\n\033[0m", argv[3], line_id1[beg[0]]);
         else
-            printf("\33[1;31m %s in %s line %d\n\033[0m", get_source_path(argv[3]), argv[0], line_id1[beg[0]]);
+            printf("\033[1;31m %s in %s line %d\n\033[0m", get_source_path(argv[3]), argv[0], line_id1[beg[0]]);
         printf("\033[1;31m%s\033[0m", num2line(argv[3], line_id1[beg[0]]));
         printf("\033[1;32m>>>>>>>>>\n\033[0m");
         if (iscommit == 0)
             printf("\033[1;32m%s line %d\n\033[0m", argv[4], line_id2[beg[1]]);
         else
-            printf("\33[1;32m %s in %s line %d\n\033[0m", get_source_path(argv[4]), argv[1], line_id2[beg[1]]);
+            printf("\033[1;32m %s in %s line %d\n\033[0m", get_source_path(argv[4]), argv[1], line_id2[beg[1]]);
         printf("\033[1;32m%s\033[0m", num2line(argv[4], line_id2[beg[1]]));
         beg[0]++;
         beg[1]++;
     }
     while (beg[0] <= en[0]){
+        isdif = 1;
         printf("\033[1;31m<<<<<<<<<\n\033[0m");
         if (iscommit == 0)
             printf("\033[1;31m%s line %d\n\033[0m", argv[3], line_id1[beg[0]]);
         else
-            printf("\33[1;31m %s in %s line %d\n\033[0m", get_source_path(argv[3]), argv[0], line_id1[beg[0]]);
+            printf("\033[1;31m %s in %s line %d\n\033[0m", get_source_path(argv[3]), argv[0], line_id1[beg[0]]);
         printf("\033[1;31m%s\033[0m", num2line(argv[3], line_id1[beg[0]]));        
         beg[0]++;
     }
     while (beg[1] <= en[1]){
+        isdif = 1;
         printf("\033[1;32m>>>>>>>>>\n\033[0m");
         if (iscommit == 0)
             printf("\033[1;32m%s line %d\n\033[0m", argv[4], line_id2[beg[1]]);
         else
-            printf("\33[1;32m %s in %s line %d\n\033[0m", get_source_path(argv[4]), argv[1], line_id2[beg[1]]);
+            printf("\033[1;32m %s in %s line %d\n\033[0m", get_source_path(argv[4]), argv[1], line_id2[beg[1]]);
         printf("\033[1;32m%s\033[0m", num2line(argv[4], line_id2[beg[1]]));        
         beg[1]++;
     }
+    return isdif;
+}
+
+bool get_diff_com(int argc, char * const argv[],bool flag){ // 0 if new should be ignored
+    char* path1 = find_source();
+    char* path2 = find_source();
+    strcat(path1, "/commits/");
+    strcat(path1, argv[3]);
+    strcat(path2, "/commits/");
+    strcat(path2, argv[4]);
+    FILE * file = fopen(path1, "r");
+    if (file == NULL){
+        fprintf(stderr, "Invalid commit id\n");
+        return 0;
+    }
+    bool isdif = 0;
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        int ln = strlen(line);
+        if (line[ln - 1] == '\n')
+            line[ln - 1] = '\0';
+        while (line[ln] != '_') ln--;
+        char * other = find_in_file(path2, line, ln);
+        if (other == NULL && flag){
+            isdif = 1;
+            printf("\033[1;31mOnly commit %s has %s\n\033[0m", argv[3], get_source_path(line));
+            continue;
+        }
+        char* arg[5] = {argv[3], argv[4], "chert", line, other};
+        isdif |= get_diff(5, arg);
+    }
+    fclose(file);
+    file = fopen(path2, "r");
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
+    while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+        int ln = strlen(line);
+        if (line[ln - 1] == '\n')
+            line[ln - 1] = '\0';
+        while (line[ln] != '_') ln--;
+        char * other = find_in_file(path1, line, ln);
+        if (other == NULL && flag){
+            isdif = 1;
+            printf("\033[1;32mOnly commit %s has %s\n\033[0m", argv[4], get_source_path(line));
+            continue;
+        }
+    }
+    fclose(file);
+    return isdif;
 }
 
 int run_diff(int argc, char * argv[]){
@@ -1914,53 +1991,92 @@ int run_diff(int argc, char * argv[]){
         return 0;
     }
     if (strcmp(argv[2], "-c") == 0){
-        char* path1 = find_source();
-        if (path1 == NULL){
+        if (find_source() == NULL){
             fprintf(stderr, "neogit storage not found!\n");
             return 1;
         }
-        char* path2 = find_source();
-        strcat(path1, "/commits/");
-        strcat(path1, argv[3]);
-        strcat(path2, "/commits/");
-        strcat(path2, argv[4]);
-        FILE * file = fopen(path1, "r");
-        if (file == NULL){
-            fprintf(stderr, "Invalid commit id\n");
-            return 0;
-        }
-        char line[MAX_LINE_LENGTH];
-        for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
-        while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-            int ln = strlen(line);
-            if (line[ln - 1] == '\n')
-                line[ln - 1] = '\0';
-            while (line[ln] != '_') ln--;
-            char * other = find_in_file(path2, line, ln);
-            if (other == NULL){
-                printf("\033[1;31mOnly commit %s has %s\n\033[0m", argv[3], get_source_path(line));
-                continue;
-            }
-            char* arg[5] = {argv[3], argv[4], "chert", line, other};
-            get_diff(5, arg);
-        }
-        fclose(file);
-        file = fopen(path2, "r");
-        for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
-        while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-            int ln = strlen(line);
-            if (line[ln - 1] == '\n')
-                line[ln - 1] = '\0';
-            while (line[ln] != '_') ln--;
-            char * other = find_in_file(path1, line, ln);
-            if (other == NULL){
-                printf("\033[1;32mOnly commit %s has %s\n\033[0m", argv[4], get_source_path(line));
-                continue;
-            }
-        }
-        fclose(file);
+        get_diff_com(argc, argv, 1);
         return 0;
     }
+}
+
+int run_merge(int argc, char * argv[]){
+    if (argc < 5){
+        fprintf(stderr, "Invalid format!\n");
+        return 1;
+    }
+    char * src = find_source();
+    if (src == NULL){
+        fprintf(stderr, "neogit storage not found!\n");
+        return 1;
+    }
+    char* head1 = get_head(argv[3]);
+    char* head2 = get_head(argv[4]);
+    char* arg[5] = {"neogit", "diff", "-c", head1, head2};
+    if (get_diff_com(5,arg, 0)){
+        fprintf(stderr, "merge failed\n");
+        return 1;
+    }
+    char user[100], email[100];
+    char* conf = find_source();
+    strcat(conf,"/config");
+    FILE* file2 = fopen(conf, "r");
+    fscanf(file2, "%s %s", user, user);
+    fscanf(file2, "%s %s", email, email);
+    fclose(file2);
+    int commit_id = inc_last_commit_ID();
+    char * des = find_source();
+    strcat(des, "/commits/");
+    strcat(des, numtostr(commit_id));
+    FILE * file = fopen(des, "w");
+    time_t t = time(NULL);
+    struct  tm tm = *localtime(&t);
+
+    fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    fprintf(file, "MESSAGE : merge commit\n");
+    fprintf(file, "user : %s\n", user);
+    fprintf(file, "email : %s\n", email);
+    fprintf(file, "commit_id : %d\n", commit_id);
+    fprintf(file, "branch : %s%s\n", argv[3], argv[4]);
+    fprintf(file, "par : %s %s\n", head1, head2);
+
+    strcat(src, "/commits/");
+    strcat(src, head1);
+    int t_commit = 0;
+    file2 = fopen(src, "r");
+    char line[MAX_LINE_LENGTH];
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file2);
+    while (fgets(line, MAX_LINE_LENGTH, file2) != NULL){
+        t_commit++;
+        fprintf(file, "%s", line);
+    }
+    fclose(file2);
+    char * src2 = find_source();
+    strcat(src2, "/commits/");
+    strcat(src2, head2);
+    file2 = fopen(src2, "r");
+    for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file2);
+    while (fgets(line, MAX_LINE_LENGTH, file2) != NULL){
+        int length = strlen(line);
+        while (line[length] != '_') length--;
+        if (find_in_file(src, line, length) != NULL) continue;
+        t_commit++;
+        fprintf(file, "%s", line);
+    }
+    fclose(file2);
+    fclose(file);
+    add_tcommit(t_commit, des);
+    //update heads
+    char * head_path = find_source();
+    strcat(head_path, "/heads");
+    file = fopen(head_path, "a");
+    char branch[MAX_LINE_LENGTH];
+    strcpy(branch, argv[3]);
+    strcat(branch, argv[4]);
+    fprintf(file, "%s %d\n", branch, commit_id);
+    fclose(file);
+    printf("successful merge!\n");
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -2027,6 +2143,9 @@ int main(int argc, char *argv[]) {
     }
     if (strcmp (command, "diff") == 0){
         return run_diff(argc, argv);
+    }
+    if (strcmp (command, "merge") == 0){
+        return run_merge(argc, argv);
     }
     return 0;
 }
