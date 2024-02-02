@@ -1937,7 +1937,7 @@ int run_diff(int argc, char * argv[]){
                 line[ln - 1] = '\0';
             while (line[ln] != '_') ln--;
             char * other = find_in_file(path2, line, ln);
-            if (other == "NULL"){
+            if (other == NULL){
                 printf("\033[1;31mOnly commit %s has %s\n\033[0m", argv[3], get_source_path(line));
                 continue;
             }
@@ -1953,7 +1953,7 @@ int run_diff(int argc, char * argv[]){
                 line[ln - 1] = '\0';
             while (line[ln] != '_') ln--;
             char * other = find_in_file(path1, line, ln);
-            if (other == "NULL"){
+            if (other == NULL){
                 printf("\033[1;32mOnly commit %s has %s\n\033[0m", argv[4], get_source_path(line));
                 continue;
             }
