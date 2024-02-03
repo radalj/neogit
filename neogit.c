@@ -159,7 +159,7 @@ void copy_folder(char *src, char* des){
 	closedir(dir);
 }
 
-int add_to_line(char * src,char* word, char* key){
+/*int add_to_line(char * src,char* word, char* key){
 	FILE * com = fopen(src, "r");
 	if (com == NULL) return 0;
 	bool exist = 0;
@@ -204,7 +204,7 @@ int add_to_line(char * src,char* word, char* key){
 	fclose(com2);
 	remove(des);
 	return 1;
-}
+}*/
 
 char * find_in_file(char * src, char* key,int num){
 	char * line = (char *)malloc(1000);
@@ -286,7 +286,6 @@ int config(int argc, char * const argv[]){
 		fprintf(stderr, "Too few arguments\n");
 		return 1;
 	}
-	debug("FUCKKK");
 	if (strcmp(argv[2], "-global") == 0){
 		if (strcmp(argv[3], "user") == 0){
 			int fl = -1;
@@ -488,6 +487,9 @@ int create_configs(char *username, char *email) {
 	fclose(file);
 
 	file = fopen(".neogit/commits/0", "w");
+	fclose(file);
+
+	file = fopen(".neogit/commands", "w");
 	fclose(file);
 	return 0;
 }
@@ -2145,9 +2147,9 @@ int main(int argc, char *argv[]) {
 		src = "/home/radal/.base";
 	}
 	FILE * file  = fopen(src, "r");
-
 	char line[MAX_LINE_LENGTH], word[MAX_LINE_LENGTH];
 	while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+		debug(line);
 		sscanf(line, "%s", word);
 		if (strcmp(word, argv[1]) != 0) continue;
 		int t = 1;
@@ -2155,6 +2157,7 @@ int main(int argc, char *argv[]) {
 		while (iswhitespace(line[sz])) sz++;
 		while (sscanf(line + sz, "%s", word) != EOF){
 			argv[t] = word;
+			sz += strlen(word);
 			while (iswhitespace(line[sz])) sz++;
 			t++;   
 		}
