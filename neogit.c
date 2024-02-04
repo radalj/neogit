@@ -494,14 +494,17 @@ int create_configs(char *username, char *email) {
 	return 0;
 }
 
-void dfs_on_files(char * path, int h){
+void dfs_on_files(char * path, int h, int num_tab){
 	int isdir = is_dir(path);
+	for (int i = 0; i < num_tab; i++) printf("\t");
+	printf("%s", path);
+	if (h != 0 || isdir == 0) printf(" : ");
 	if (isdir == 0){
-		printf("%s : ", path);
-		if (is_staged(path)) printf("staged\n");
-		else printf("unstaged\n");
+		if (is_staged(path)) printf("\033[1;32mstaged\n\033[0m");
+		else printf("\033[1;31munstaged\n\033[0m");
 		return;
 	}
+	printf("\n");
 	if (h == 0) return;
 	DIR *dir = opendir(path);
 	struct dirent *entry;
@@ -510,7 +513,7 @@ void dfs_on_files(char * path, int h){
 		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
 		strcat(path,"/");
 		strcat(path, entry->d_name);
-		dfs_on_files(path, h - 1);
+		dfs_on_files(path, h - 1, num_tab + 1);
 		path[ln] = '\0';
 	}
 	closedir(dir); 
@@ -571,7 +574,7 @@ int run_add(int argc, char *const argv[]) {
 	if (strcmp(argv[2], "-n") == 0){
 		char cwd[MAX_LINE_LENGTH];
 		getcwd(cwd, MAX_LINE_LENGTH);
-		dfs_on_files(cwd, atoi(argv[3]));
+		dfs_on_files(cwd, atoi(argv[3]), 0);
 	}
 }
 
