@@ -1246,8 +1246,8 @@ int run_log(int argc, char * const argv[]){
 		fprintf(stderr, "neogit storage not found!\n");
 		return 1;
 	}
-	bool isbr = (strcmp("-branch", argv[2]) == 0);
-	bool isauth = (strcmp("-author", argv[2]) == 0);
+	bool isbr = (argc > 2 && (strcmp("-branch", argv[2]) == 0));
+	bool isauth = (argc > 2 && (strcmp("-author", argv[2]) == 0));
 	if (isbr && is_val_branch(argv[3]) == 0){
 		fprintf(stderr,"Not a valid branch\n");
 		return 1;
