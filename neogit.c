@@ -1050,7 +1050,9 @@ int run_commit(int argc, char * const argv[]) {
 	t_commit = 0;
 	//write commit info
 	FILE * file = fopen(src, "w");
-	fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	int day = tm.tm_mday, mon = tm.tm_mon + 1, year = tm.tm_year + 1900, hour = tm.tm_hour;
+	int min = tm.tm_min,sec = tm.tm_sec;
+	fprintf(file, "TIME : %d/%d/%d    %d:%d:%d\n", day, mon, year, hour, min, sec);
 	fprintf(file, "MESSAGE : %s\n", message);
 	fprintf(file, "user : %s\n", user);
 	fprintf(file, "email : %s\n", email);
@@ -1115,7 +1117,9 @@ int run_commit(int argc, char * const argv[]) {
 	free(tmp);
 	free(last_commit);
 	free(src_deleted);
-	fprintf(stdout, "commit successfully with commit ID %d\n", commit_ID);
+	printf("commit successfully with commit ID %d\n", commit_ID);
+	printf("commit message : %s\n", message);
+	printf("TIME : %d/%d/%d    %d:%d:%d\n", day, mon, year, hour, min, sec);
 	return 0;
 }
 
