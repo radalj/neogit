@@ -272,8 +272,8 @@ void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
 	conf = fopen(newdir, "w");
 	fprintf(conf, "username: %s\n", username);
 	fprintf(conf, "email: %s\n", email);
-	fprintf(conf, "last_commit_id: %s\n", last_commit_id);
-	fprintf(conf, "current_commit_id: %s\n", current_commit_id);
+	fprintf(conf, "last_commit_ID: %s\n", last_commit_id);
+	fprintf(conf, "current_commit_ID: %s\n", current_commit_id);
 	fprintf(conf, "branch: %s\n", branch);
 	fclose(conf);
 	free(newdir);
