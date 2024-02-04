@@ -2144,67 +2144,74 @@ int main(int argc, char *argv[]) {
 	}
 	else{
 		src = (char *)malloc(100);
-		src = "/home/radal/.base";
+		src = "/home/radal/.base/commands";
 	}
 	FILE * file  = fopen(src, "r");
 	char line[MAX_LINE_LENGTH], word[MAX_LINE_LENGTH];
+	char *nw_argv[100];
+	for(int i = 0; i < argc; i++){
+		nw_argv[i] = (char *)malloc(100);
+		strcpy(nw_argv[i], argv[i]);
+	}
 	while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-		debug(line);
 		sscanf(line, "%s", word);
 		if (strcmp(word, argv[1]) != 0) continue;
 		int t = 1;
 		int sz = strlen(word);
 		while (iswhitespace(line[sz])) sz++;
 		while (sscanf(line + sz, "%s", word) != EOF){
-			argv[t] = word;
+			nw_argv[t] = (char *)malloc(100);
+			strcpy(nw_argv[t], word);
 			sz += strlen(word);
 			while (iswhitespace(line[sz])) sz++;
 			t++;   
 		}
+		argc = t;
+		break;
 	}
 	fclose(file);
-	if (strcmp(argv[1], "config") == 0){
-		return config(argc, argv);
+	if (strcmp(nw_argv[1], "config") == 0){
+		return config(argc, nw_argv);
 	}
-	if (strcmp(argv[1], "init") == 0) {
-		return run_init(argc, argv);
+	if (strcmp(nw_argv[1], "init") == 0) {
+		return run_init(argc, nw_argv);
 	}
-	if (strcmp(argv[1], "add") == 0) {
-		return run_add(argc, argv);
+	if (strcmp(nw_argv[1], "add") == 0) {
+		return run_add(argc, nw_argv);
 	}
 	if (strcmp(argv[1], "reset") == 0) {
-		return run_reset(argc, argv);
+		return run_reset(argc, nw_argv);
 	}
-	if (strcmp(argv[1], "status") == 0) {
+	if (strcmp(nw_argv[1], "status") == 0) {
 		return run_status();
 	}
-	if (strcmp(argv[1], "commit") == 0) {
-		return run_commit(argc, argv);
+	if (strcmp(nw_argv[1], "commit") == 0) {
+		return run_commit(argc, nw_argv);
 	}
-	if (strcmp(argv[1], "log") == 0){
-		return run_log(argc, argv);
+	if (strcmp(nw_argv[1], "log") == 0){
+		return run_log(argc, nw_argv);
 	}
-	if (strcmp (argv[1], "branch") == 0){
-		return run_branch(argc, argv);
+	if (strcmp (nw_argv[1], "branch") == 0){
+		return run_branch(argc, nw_argv);
 	}
-	if (strcmp (argv[1], "checkout") == 0){
-		return run_checkout(argc, argv);
+	if (strcmp (nw_argv[1], "checkout") == 0){
+		return run_checkout(argc, nw_argv);
 	}
 	// phase 2
-	if (strcmp (argv[1], "revert") == 0){
-		return run_revert(argc, argv);
+	if (strcmp (nw_argv[1], "revert") == 0){
+		return run_revert(argc, nw_argv);
 	}
-	if (strcmp (argv[1], "tag") == 0){
-		return run_tag(argc, argv);
+	if (strcmp (nw_argv[1], "tag") == 0){
+		return run_tag(argc, nw_argv);
 	}
-	if (strcmp (argv[1], "diff") == 0){
-		return run_diff(argc, argv);
+	if (strcmp (nw_argv[1], "diff") == 0){
+		return run_diff(argc, nw_argv);
 	}
-	if (strcmp (argv[1], "merge") == 0){
-		return run_merge(argc, argv);
+	if (strcmp (nw_argv[1], "merge") == 0){
+		return run_merge(argc, nw_argv);
 	}
-	if (strcmp (argv[1], "grep") == 0){
-		return run_grep(argc, argv);
+	if (strcmp (nw_argv[1], "grep") == 0){
+		return run_grep(argc, nw_argv);
 	}
 	return 0;
 }
