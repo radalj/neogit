@@ -516,7 +516,7 @@ void dfs_on_files(char * path, int h, int num_tab){
 		dfs_on_files(path, h - 1, num_tab + 1);
 		path[ln] = '\0';
 	}
-	closedir(dir); 
+	closedir(dir);
 }
 
 int run_add(int argc, char *const argv[]) {
@@ -618,7 +618,7 @@ int add_to_staging(char *filepath,int num) {
 	int isdir = is_dir(filepath);
 	if (isdir == -1){
 		if (add_to_staging_deleted(filepath)){
-			printf("there's no such file or folder!\n");
+			printf("there's no such file or folder as %s!\n", filepath);
 			return 1;
 		}
 		return 0;
@@ -661,8 +661,8 @@ int add_to_staging(char *filepath,int num) {
 		FILE * file = fopen(src, "r");
 		FILE * file2 = fopen(tmp, "w");
 		while (fgets(line, 1000, file) != NULL){
-			int ln = strlen(line);
-			if (line[ln - 1] == '\n') line[ln - 1] = '\0';
+			int length = strlen(line) - 1;
+			if (line[length] == '\n') line[length] = '\0';
 			if (strncmp(line,des,ln) == 0) continue;
 			fprintf(file2, "%s\n", line);
 		}
