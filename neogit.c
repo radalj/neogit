@@ -2083,6 +2083,12 @@ int run_merge(int argc, char * argv[]){
 	fprintf(file, "%s %d\n", branch, commit_id);
 	fclose(file);
 	printf("successful merge!\n");
+	// update last_merge
+	char * last_merge = find_source();
+	strcat(last_merge, "/last_merge");
+	file2 = fopen(last_merge, "w");
+	fprintf(file2, "%d", commit_id);
+	fclose(file2);
 	return 0;
 }
 
