@@ -770,9 +770,12 @@ int remove_from_staging(char *filepath) {
 	strcat(fake, "/tmp");
 	fl = fopen(src, "r");
 	tmp = fopen(fake, "w");
-	ln = strlen(filepath);
+	bad = find_source();
+	strcat(bad, "/all/");
+	strcat(bad,pathto_(filepath));
+	ln = strlen(bad);
 	while (fgets(line, 1000, fl) != NULL){
-		if (strncmp(filepath, line, ln) == 0) continue;
+		if (strncmp(bad, line, ln) == 0) continue;
 		fprintf(tmp, "%s", line);
 	}
 	fclose(fl);
