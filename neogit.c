@@ -209,7 +209,7 @@ char* get_head(char * branch){
 void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
 	char * newdir = malloc(strlen(dir)+50);
 	strcpy(newdir, dir);
-	strcat(newdir,"/.neogit/config\0");
+	strcat(newdir,"/.neogit/config");
 	FILE* conf = fopen(newdir, "r");
 	if (conf == NULL) return;
 	char username[100],email[200],last_commit_id[10],current_commit_id[10],branch[100];
@@ -233,7 +233,7 @@ void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
 	return;
 }
 
-int config(int argc, char * const argv[]){    
+int run_config(int argc, char * const argv[]){    
 	bool isglobal = (strcmp(argv[2], "-global") != 0);
 	if (argc < 6 - isglobal){
 		fprintf(stderr, "Too few arguments\n");
@@ -620,12 +620,18 @@ int add_to_staging(char *filepath,int num) {
 		FILE * file = fopen(src, "r");
 		FILE * file2 = fopen(tmp, "w");
 		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-			int length = strlen(line);
+			int length = strlen(line),length2 = strlen(des);
 			if (line[length - 1] == '\n') line[length - 1] = '\0';
 			while (line[length] != '_') length--;
+			while (des[length2] != '_') length2--;
 			line[length] = '\0';
-			if (strcmp(line,des) == 0) continue;
+			des[length2] = '\0';
+			if (strcmp(line,des) == 0){
+				des[length2] = '_';
+				 continue;
+			}
 			line[length] = '_';
+			des[length2] = '_';
 			fprintf(file2, "%s\n", line);
 		}
 		fclose(file);
@@ -701,7 +707,7 @@ int run_reset(int argc, char *const argv[]) {
 }
 
 int remove_from_staging(char *filepath) {
-	char * src = find_source(filepath);
+	char * src = find_source();
 	if (src == NULL){
 		printf("neogit storage not found!\n");
 		return 1;
@@ -716,13 +722,12 @@ int remove_from_staging(char *filepath) {
 	char * bad = find_source();
 	strcat(bad, "/all/");
 	strcat(bad,pathto_(filepath));
+	int length = strlen(bad);
 	while (fgets(line, MAX_LINE_LENGTH, fl) != NULL){
-		int ln = strlen(line);
-		while (line[ln] != '_') ln--;
-		line[ln] = '\0';
-		if (strcmp(bad, line) == 0) continue;
-		line[ln] = '_';
-		fprintf(tmp, "%s", line);
+		int ln = strlen(line) - 1;
+		while (line[ln] == '\n') line[ln] = '\0';
+		if (strncmp(bad, line, length) == 0) continue;
+		fprintf(tmp, "%s\n", line);
 	}
 	fclose(fl);
 	fclose(tmp);
@@ -738,10 +743,11 @@ int remove_from_staging(char *filepath) {
 	bad = find_source();
 	strcat(bad, "/all/");
 	strcat(bad,pathto_(filepath));
+	length = strlen(bad);
 	while (fgets(line, MAX_LINE_LENGTH, fl) != NULL){
 		int ln = strlen(line) - 1;
 		if (line[ln] == '\n') line[ln] = '\0';
-		if (strcmp(bad, line) == 0) continue;
+		if (strncmp(bad, line, length) == 0) continue;
 		fprintf(tmp, "%s\n", line);
 	}
 	fclose(fl);
@@ -2210,7 +2216,7 @@ int main(int argc, char *argv[]) {
 	}
 	fclose(file);
 	if (strcmp(nw_argv[1], "config") == 0){
-		return config(argc, nw_argv);
+		return run_config(argc, nw_argv);
 	}
 	if (strcmp(nw_argv[1], "init") == 0){
 		return run_init(argc, nw_argv);
