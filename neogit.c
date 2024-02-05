@@ -159,53 +159,6 @@ void copy_folder(char *src, char* des){
 	closedir(dir);
 }
 
-/*int add_to_line(char * src,char* word, char* key){
-	FILE * com = fopen(src, "r");
-	if (com == NULL) return 0;
-	bool exist = 0;
-	char* line = (char *)malloc(1000);
-	char part[100];
-	int line_num = 0;
-	while (fgets(line, 1000, com) != NULL){
-		line_num++;
-		while (sscanf(line, "%s", part) != EOF){
-			line += strlen(part);
-			if (line[0] != '\0') line++;
-			if (strcmp(part, key) == 0){
-				exist = 1;
-				break;
-			}
-		}
-		if (exist){
-			break;
-		}
-	}
-	if (exist == 0){
-		return 0;
-	}
-	fclose(com);
-	char* des = "/home/radal/.base/commands_copy";
-	copy_file(src, des);
-	int i = 0;
-	com = fopen(src, "w");
-	FILE* com2 = fopen(des, "r");
-	while (fgets(line, 1000, com2) != NULL){
-		i++;
-		int ln = strlen(line);
-		if (line[ln - 1] == '\n') line[ln - 1] = '\0';
-		if (i == line_num){
-			fprintf(com, "%s %s\n", line, word);
-		}
-		else{
-			fprintf(com, "%s\n", line);
-		}
-	}
-	fclose(com);
-	fclose(com2);
-	remove(des);
-	return 1;
-}*/
-
 char * find_in_file(char * src, char* key,int num){
 	char * line = (char *)malloc(1000);
 	FILE * file = fopen(src, "r");
@@ -405,8 +358,7 @@ int run_init(int argc, char * const argv[]) {
 		}
 
 	} while (strcmp(tmp_cwd, "/") != 0);
-
-	// return to the initial cwd
+		// return to the initial cwd
 	if (chdir(cwd) != 0) return 1;
 		
 	if (!exists) {
@@ -1809,11 +1761,7 @@ char ** filetochar(char * path){
 		if (line[sum_size] == '\0') continue;
 		ans[num] = (char *) malloc(MAX_LINE_LENGTH);
 		ans[num][0] = '\0';
-		while (sscanf(line + sum_size, "%s", word) != EOF){
-			sum_size += strlen(word);
-			while (iswhitespace(line[sum_size])) sum_size++;
-			strcat(ans[num], word);
-		}
+		strcpy(ans[num], line);
 		num++;
 	}
 	for (int i = num; i < MAX_LINE_NUMBER; i++) ans[i] = NULL;
@@ -2189,7 +2137,7 @@ int main(int argc, char *argv[]) {
 	if (strcmp(nw_argv[1], "config") == 0){
 		return config(argc, nw_argv);
 	}
-	if (strcmp(nw_argv[1], "init") == 0) {
+	if (strcmp(nw_argv[1], "init") == 0){
 		return run_init(argc, nw_argv);
 	}
 	if (strcmp(nw_argv[1], "add") == 0) {
