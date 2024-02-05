@@ -552,13 +552,17 @@ int add_to_staging_deleted(char * filepath){
 		char* stg = find_source();
 		strcat(stg, "/staging_0");
 		if (find_in_file(stg, src, strlen(src)) != NULL){
-			char line[1000];
+			char line[MAX_LINE_LENGTH];
 			char * add = find_source();
 			strcat(add, "/tmp");
 			fl = fopen(stg, "r");
 			FILE *tmp = fopen(add, "w");
-			while(fgets(line, 1000, fl) != NULL){
-				if (strncmp(line, src, strlen(src)) == 0) continue;
+			while(fgets(line, MAX_LINE_LENGTH, fl) != NULL){
+				int ln = strlen(line);
+				while (line[ln] != '_') ln--;
+				line[ln] = '\0';
+				if (strcmp(line, src) == 0) continue;
+				line[ln] = '_';
 				fprintf(tmp, "%s", line);
 			}
 			fclose(tmp);
@@ -610,15 +614,18 @@ int add_to_staging(char *filepath,int num) {
 	track_file(filepath);
 	strcat(src, "/staging_0");
 	if (find_in_file(src, des, ln) != NULL){
-		char line[1000];
+		char line[MAX_LINE_LENGTH];
 		char * tmp = find_source();
 		strcat(tmp,"/tmp");
 		FILE * file = fopen(src, "r");
 		FILE * file2 = fopen(tmp, "w");
-		while (fgets(line, 1000, file) != NULL){
-			int length = strlen(line) - 1;
-			if (line[length] == '\n') line[length] = '\0';
-			if (strncmp(line,des,ln) == 0) continue;
+		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+			int length = strlen(line);
+			if (line[length - 1] == '\n') line[length - 1] = '\0';
+			while (line[length] != '_') length--;
+			line[length] = '\0';
+			if (strcmp(line,des) == 0) continue;
+			line[length] = '_';
 			fprintf(file2, "%s\n", line);
 		}
 		fclose(file);
@@ -709,9 +716,12 @@ int remove_from_staging(char *filepath) {
 	char * bad = find_source();
 	strcat(bad, "/all/");
 	strcat(bad,pathto_(filepath));
-	int ln = strlen(bad);
-	while (fgets(line, 1000, fl) != NULL){
-		if (strncmp(bad, line, ln) == 0) continue;
+	while (fgets(line, MAX_LINE_LENGTH, fl) != NULL){
+		int ln = strlen(line);
+		while (line[ln] != '_') ln--;
+		line[ln] = '\0';
+		if (strcmp(bad, line) == 0) continue;
+		line[ln] = '_';
 		fprintf(tmp, "%s", line);
 	}
 	fclose(fl);
@@ -728,10 +738,11 @@ int remove_from_staging(char *filepath) {
 	bad = find_source();
 	strcat(bad, "/all/");
 	strcat(bad,pathto_(filepath));
-	ln = strlen(bad);
-	while (fgets(line, 1000, fl) != NULL){
-		if (strncmp(bad, line, ln) == 0) continue;
-		fprintf(tmp, "%s", line);
+	while (fgets(line, MAX_LINE_LENGTH, fl) != NULL){
+		int ln = strlen(line) - 1;
+		if (line[ln] == '\n') line[ln] = '\0';
+		if (strcmp(bad, line) == 0) continue;
+		fprintf(tmp, "%s\n", line);
 	}
 	fclose(fl);
 	fclose(tmp);
@@ -2086,12 +2097,13 @@ int run_grep(int argc, char * const argv[]){
 	char * address = find_source();
 	strcat(address, "/all/");
 	strcat(address,pathto_(abs_path(argv[3])));
-	int length = strlen(address);
 	for (int i = 0; i < 8; i++) fgets(line, MAX_LINE_LENGTH, file);
 	while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
 		int ln = strlen(line) - 1;
-		if (line[ln] == '\n') line[ln] = '\0';
-		if (strncmp(line, address, length) == 0){
+		while (line[ln] != '_') ln--;
+		line[ln] = '\0';
+		if (strcmp(line, address) == 0){
+			line[ln] = '_';
 			grep_in_file(line, argv[5], has_n);
 			break;
 		}
