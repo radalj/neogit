@@ -430,6 +430,9 @@ int create_configs(char *username, char *email) {
 	file = fopen(".neogit/tracks", "w");
 	fclose(file);
 
+	file = fopen(".neogit/hooks", "w");
+	fclose(file);
+
 	file = fopen(".neogit/addnum", "w");
 	fprintf(file, "%d\n", 0);
 	fclose(file);
@@ -2097,6 +2100,66 @@ int run_grep(int argc, char * const argv[]){
 	return 0;
 }
 
+int run_pre_commit (int argc, char * const argv[]){
+	if (argc < 4){
+		fprintf(stderr, "invalid command!\n");
+		return 1;
+	}
+	if (strcmp(argv[2], "hooks") == 0 && strcmp(argv[3], "list") == 0){
+		FILE * file = fopen("/home/radal/.base/hooks", "r");
+		char line[MAX_LINE_LENGTH];
+		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+			printf("%s", line);
+		}
+		fclose(file);
+		return 0;
+	}
+
+	char * src = find_source();
+	if (src == NULL){
+		fprintf(stderr, "neogit storage not found!\n");
+		return 1;
+	}
+	strcat(src, "/hooks");
+	if (strcmp(argv[2], "applied") == 0 && strcmp(argv[3], "hooks") == 0){
+		FILE * file = fopen(src, "r");
+		char line[MAX_LINE_LENGTH];
+		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+			printf("%s", line);
+		}
+		fclose(file);
+		return 0;
+	}
+	if (argc < 5){
+		fprintf(stderr, "Invalid command!\n");
+		return 1;
+	}
+	if (strcmp(argv[2], "add") == 0 && strcmp(argv[3], "hook") == 0){
+		FILE * file = fopen(src, "a");
+		fprintf(file, "%s\n", argv[4]);
+		fclose(file);
+		return 0;
+	}
+	if (strcmp(argv[2], "remove") == 0 && strcmp(argv[3], "hook") == 0){
+		char * des = find_source();
+		strcat(des, "/tmp");
+		FILE * file = fopen(src, "r");
+		FILE * file2 = fopen(des, "w");
+		char line[MAX_LINE_LENGTH];
+		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+			int ln = strlen(line) - 1;
+			if (line[ln] == '\n') line[ln] = '\0';
+			if (strcmp(line, argv[4]) == 0) continue;
+			fprintf(file2, "%s\n", line);
+		}
+		fclose(file2);
+		fclose(file);
+		remove(src);
+		rename(des, src);
+		return 0;
+	}
+}
+
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		fprintf(stdout, "please enter a valid command\n");
@@ -2176,6 +2239,9 @@ int main(int argc, char *argv[]) {
 	}
 	if (strcmp (nw_argv[1], "grep") == 0){
 		return run_grep(argc, nw_argv);
+	}
+	if (strcmp (nw_argv[1], "pre-commit") == 0){
+		return run_pre_commit(argc, argv);
 	}
 	return 0;
 }
