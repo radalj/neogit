@@ -98,9 +98,9 @@ char * pathto_(char * filepath){
 }
 
 char * get_source_path(char *path){
-	char * ans = (char *)malloc(strlen(path));
-	strcpy(ans, path);
 	int ln = strlen(path);
+	char * ans = (char *)malloc(MAX_LINE_LENGTH);
+	strcpy(ans, path);
 	bool fst = 0;
 	for (int i = ln - 1; i >= 0; i--){
 		if (ans[i] == '/'){
@@ -160,7 +160,7 @@ void copy_folder(char *src, char* des){
 }
 
 char * find_in_file(char * src, char* key,int num){
-	char * line = (char *)malloc(1000);
+	char * line = (char *)malloc(MAX_LINE_LENGTH);
 	FILE * file = fopen(src, "r");
 	while (fgets(line, 1000, file) != NULL){
 		int ln = strlen(line);
@@ -1509,7 +1509,7 @@ int run_checkout(int argc, char* const argv[]){
 		fprintf(stderr, "Please enter a valid commit id\n");
 		return 1;
 	}
-	if (find_source == NULL){
+	if (find_source() == NULL){
 		fprintf(stderr, "neogit storage not found!\n");
 		return 1;
 	}
@@ -2119,6 +2119,53 @@ int run_grep(int argc, char * const argv[]){
 }
 
 int run_pre_commit (int argc, char * const argv[]){
+	if (argc == 2){
+		char *applied_hooks[100];
+		int t_hooks = 0;
+		char * hooks = find_source();
+		if (hooks == NULL){
+			fprintf(stderr, "neogit storage not found!\n");
+			return 1;
+		}
+		strcat(hooks, "/hooks");
+		FILE * file = fopen(hooks, "r");
+		char line[MAX_LINE_LENGTH];
+		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+			int ln = strlen(line) - 1;
+			if (line[ln] == '\n') line[ln] = '\0';
+			applied_hooks[t_hooks] = (char *)malloc(MAX_LINE_LENGTH);
+			strcpy(applied_hooks[t_hooks], line);
+			t_hooks++;
+		}
+		fclose(file);
+		char * stg = find_source();
+		strcat(stg, "/staging_0");
+		file = fopen(stg, "r");
+		while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+			int ln = strlen(line) - 1;
+			if (line[ln] == '\n') line[ln] = '\0';
+			printf("%s:\n", get_source_path(line));
+			for (int i = 0; i < t_hooks; i++){
+				printf("\t%s..............................", applied_hooks[i]);
+				if (strcmp(applied_hooks[i], "file-size-check") == 0){
+					FILE * file2 = fopen(line, "r");
+					fseek(file2, 0L, SEEK_END);
+					int sz = ftell(file2);
+					fclose(file2);
+					if (sz > 5 * 1000000){
+						printf("\033[1;31mFAILED\n\033[0m");
+					}
+					else
+						printf("\033[1;32mPASSED\n\033[0m");
+					continue;
+				}
+				printf("SKIPPED\n");
+			}
+
+		}
+		fclose(file);
+		return 0;
+	}
 	if (argc < 4){
 		fprintf(stderr, "invalid command!\n");
 		return 1;
