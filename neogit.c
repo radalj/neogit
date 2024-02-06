@@ -2202,6 +2202,17 @@ int run_pre_commit (int argc, char * const argv[]){
 						printf("\033[1;32mPASSED\n\033[0m");
 					continue;
 				}
+				if (strcmp(applied_hooks[i], "format-check") == 0){
+					bool fl = 0;
+					if (strcmp(format, ".c") == 0 || strcmp(format, ".cpp") == 0 || strcmp(format, ".txt") == 0) fl = 1;
+					if (strcmp(format, ".mp4") == 0 || strcmp(format, ".wav") == 0 || strcmp(format, ".mp3") == 0) fl = 1;
+					if (!fl){
+						printf("\033[1;31mFAILED\n\033[0m");
+					}
+					else
+						printf("\033[1;32mPASSED\n\033[0m");
+					continue;
+				}
 				printf("SKIPPED\n");
 			}
 
