@@ -2169,6 +2169,13 @@ int run_pre_commit (int argc, char * const argv[]){
 			int ln = strlen(line) - 1;
 			if (line[ln] == '\n') line[ln] = '\0';
 			printf("%s:\n", get_source_path(line));
+			char format[5];
+			while (line[ln] != '_') ln--;
+			line[ln] = '\0';
+			int ind = ln;
+			while (line[ind] != '.') ind--;
+			strcpy(format, line + ind);
+			line[ln] = '_';
 			for (int i = 0; i < t_hooks; i++){
 				printf("\t%s..............................", applied_hooks[i]);
 				if (strcmp(applied_hooks[i], "file-size-check") == 0){
@@ -2177,6 +2184,18 @@ int run_pre_commit (int argc, char * const argv[]){
 					int sz = ftell(file2);
 					fclose(file2);
 					if (sz > 5 * 1000000){
+						printf("\033[1;31mFAILED\n\033[0m");
+					}
+					else
+						printf("\033[1;32mPASSED\n\033[0m");
+					continue;
+				}
+				if (strcmp(applied_hooks[i], "character-limit") == 0 && (strcmp(format, ".c") == 0 || strcmp(format, ".cpp") == 0 || strcmp(format, ".txt") == 0)){
+					FILE * file2 = fopen(line, "r");
+					fseek(file2, 0L, SEEK_END);
+					int sz = ftell(file2);
+					fclose(file2);
+					if (sz > 20000){
 						printf("\033[1;31mFAILED\n\033[0m");
 					}
 					else
