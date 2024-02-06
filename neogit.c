@@ -24,6 +24,7 @@ int inc_last_commit_ID();
 int track_file(char *filepath);
 bool is_tracked(char *filepath);
 bool is_staged(char * path);
+char * get_branch(char * commit_id);
 
 void add_tcommit(int t_commit, char * path){
 	char * path2 = (char *)malloc(MAX_LINE_LENGTH);
@@ -118,6 +119,7 @@ char * get_source_path(char *path){
 	return ans;
 }
 
+
 void copy_file(char *src,char * des){
 	FILE * s = fopen(src, "r");
 	FILE * d = fopen(des, "w");
@@ -204,6 +206,30 @@ char* get_head(char * branch){
 	fclose(H);
 	if (exist) return ans;    
 	return NULL;
+}
+
+void change_head(char * commit_id){
+	char * branch = get_branch(commit_id);
+	char * src = find_source();
+	char * tmp = find_source();
+	strcat(src, "/heads");
+	strcat(tmp, "/tmp_heads");
+	FILE * file = fopen(src, "r");
+	FILE * file2 = fopen(tmp, "w");
+	char line[MAX_LINE_LENGTH];
+	while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
+		char word[MAX_LINE_LENGTH];
+		sscanf(line, "%s", word);
+		if (strcmp(branch, word) != 0){
+			fprintf(file2, "%s", line);
+			continue;
+		}
+		fprintf(file2, "%s %s\n", branch, commit_id);
+	}
+	fclose(file2);
+	fclose(file);
+	remove(src);
+	rename(tmp, src);
 }
 
 void write_config(char* dir,char* nw,int fl){ //fl = 0 name fl = 1 email
@@ -1053,24 +1079,13 @@ int run_commit(int argc, char * const argv[]) {
 	fclose(file2);
 	add_tcommit(t_commit, src);
 	//change head
-	char* tmp = find_source();
-	strcat(tmp, "/tmp");
-	file2 = fopen(tmp, "w");
-	file = fopen(head, "r");
-	while (fgets(line, MAX_LINE_LENGTH, file) != NULL){
-		if (strncmp(line, branch, strlen(branch)) == 0)
-			fprintf(file2, "%s %d\n", branch, commit_ID);
-		else
-			fprintf(file2,"%s", line);
-	}
-	fclose(file2);
-	fclose(file);
-	remove(head);
-	rename(tmp, head);
+	change_head(numtostr(commit_ID));
 
 	//write config
 	char * conf = find_source();
 	strcat(conf, "/config");
+	char * tmp = find_source();
+	strcat(tmp, "/tmp_file");
 	file2 = fopen(tmp, "w");
 	file = fopen(conf, "r");
 	for (int i = 0; i < 5; i++){
@@ -1412,6 +1427,27 @@ void delete_all_files(char * path){
 	closedir(dir);
 }
 
+void change_cur_commit(char * commit_id){
+	char * conf = find_source();
+	char * tmp = find_source();
+	strcat(conf, "/config");
+	strcat(tmp, "/tmp");
+	FILE * file = fopen(conf, "r");
+	FILE * file2 = fopen(tmp, "w");
+	char line[MAX_LINE_LENGTH];
+	for (int i = 0; i < 3; i++){
+		fgets(line, MAX_LINE_LENGTH, file);
+		fprintf(file2, "%s", line);
+	}
+	fprintf(file2, "current_commit_ID: %s\n", commit_id);
+	fprintf(file2, "branch: %s\n", get_branch(commit_id));
+	fclose(file);
+	fclose(file2);
+	remove(conf);
+	rename(tmp, conf);	
+	return;
+}
+
 int goto_commit(char * commit_id){
 	char * src_files = find_source();
 	strcat(src_files, "/files");
@@ -1445,6 +1481,7 @@ int goto_commit(char * commit_id){
 		copy_file(line, des);
 	}
 	fclose(com_file);
+	change_cur_commit(commit_id);
 	return 0;
 }
 
@@ -1537,24 +1574,6 @@ int run_checkout(int argc, char* const argv[]){
 	}
 	printf("You checkouted to commit %s\n", commit_id);
 	goto_commit(commit_id);
-	char* nw_br = get_branch(commit_id);
-	char * conf = find_source();
-	char * tmp = find_source();
-	strcat(conf, "/config");
-	strcat(tmp, "/tmp");
-	FILE* src = fopen(conf, "r");
-	FILE* des = fopen(tmp, "w");
-	char line[MAX_LINE_LENGTH];
-	for (int i = 0; i < 3; i++){
-		fgets(line, MAX_LINE_LENGTH, src);
-		fprintf(des, "%s", line);
-	}
-	fprintf(des, "current_commit_ID: %s\n", commit_id);
-	fprintf(des, "branch: %s\n", nw_br);
-	fclose(des);
-	fclose(src);
-	remove(conf);
-	rename(tmp, conf);
 	return 0;
 }
 
@@ -1644,6 +1663,8 @@ int run_revert(int argc, char * const argv[]){
 	}
 	fclose(file2);
 	fclose(file);
+	change_cur_commit(numtostr(nw_id));
+	change_head(numtostr(nw_id));
 	printf("Project is now at %d\n", nw_id);
 	return 0;
 }
