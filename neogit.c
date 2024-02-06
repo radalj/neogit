@@ -1955,9 +1955,11 @@ bool get_diff_com(int argc, char * const argv[],bool flag){ // 0 if new should b
 			line[ln - 1] = '\0';
 		while (line[ln] != '_') ln--;
 		char * other = find_in_file(path2, line, ln);
-		if (other == NULL && flag){
-			isdif = 1;
-			printf("\033[1;31mOnly commit %s has %s\n\033[0m", argv[3], get_source_path(line));
+		if (other == NULL){
+			if (flag){
+				isdif = 1;
+				printf("\033[1;31mOnly commit %s has %s\n\033[0m", argv[3], get_source_path(line));
+			}
 			continue;
 		}
 		char* arg[5] = {argv[3], argv[4], "chert", line, other};
@@ -2085,6 +2087,7 @@ int run_merge(int argc, char * argv[]){
 	file2 = fopen(last_merge, "w");
 	fprintf(file2, "%d", commit_id);
 	fclose(file2);
+	goto_commit(numtostr(commit_id));
 	return 0;
 }
 
